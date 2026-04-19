@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>LoreChat</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- SETTINGS VIEW -->
+    <div v-if="view === 'settings'" class="view">
+      <div class="topbar">
+        <button class="icon-btn" @click="goBack()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <span class="topbar-title">Settings</span>
+      </div>
+      <div class="view-body padded">
+        <div class="settings-section">
+          <div class="settings-label">Pollinations API Key</div>
+          <input class="text-input" type="password" v-model="settings.apiKey" placeholder="sk_..." />
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Default Model</div>
+          <select class="text-input" v-model="settings.model">
+            <option value="openai">OpenAI (GPT-4o)</option>
+            <option value="claude">Claude</option>
+            <option value="mistral">Mistral</option>
+            <option value="gemini">Gemini</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Memory Depth (messages)</div>
+          <input class="text-input" type="number" v-model.number="settings.memoryDepth" min="5" max="100" />
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Story Chunk Size</div>
+          <select class="text-input" v-model="settings.storyChunkSize">
+            <option value="short">Short (1-2 paragraphs)</option>
+            <option value="medium">Medium (2-3 paragraphs)</option>
+            <option value="long">Long (full scene)</option>
+          </select>
+        </div>
+        <button class="btn-primary full-width" @click="saveSettings()">Save Settings</button>
+        <div class="settings-section mt-lg">
+          <div class="settings-label">Data Management</div>
+          <button class="btn-secondary full-width mb-sm" @click="exportAll()">
+            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            Export All Data
+          </button>
+          <button class="btn-secondary full-width" @click="triggerImport()">
+            <svg viewBox="0 0 24 24"><path d="M5 15H3v4a2 2 0 002 2h14a2 2 0 002-2v-4h-2v4H5v-4zm9-3l-1 1V3h-2v10l-1-1-1.41 1.41L12 16.83l3.41-3.42L14 12z"/></svg>
+            Import Data
+          </button>
+          <input type="file" ref="importFile" accept=".json" style="display:none" @change="importAll($event)" />
+        </div>
+        <div v-if="settingsSaved" class="toast">Settings saved!</div>
+      </div>
+    </div>
+
+    <!-- HOME VIEW -->
+    <div v-else-if="view === 'home'" class="view">
+      <div class="topbar">
+        <div class="topbar-brand">
+          <svg viewBox="0 0 24 24" class="brand-icon"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+          LoreChat
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-btn" @click="navigate('bots')">
+            <svg viewBox="0 0 24 24"><path d="M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4c1.66 0 3-1.34 3-3s-1.34-3-3-3zm-2 10H6V7h12v12zm-9-6c-.83 0-1.5-.67-1.5-1.5S8.17 10 9 10s1.5.67 1.5 1.5S9.83 13 9 13zm6 0c-.83 0-1.5-.67-1.5-1.5S14.17 10 15 10s1.5.67 1.5 1.5S15.83 13 15 13zm-3 3h-2v-2h2v2zm2 0h-2v-2h2v2z"/></svg>
+          </button>
+          <button class="icon-btn" @click="navigate('settings')">
+            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tab-bar">
+        <button :class="['tab', homeTab==='chats'?'active':'']" @click="homeTab='chats'">Chats</button>
+        <button :class="['tab', homeTab==='adventure'?'active':'']" @click="homeTab='adventure'">Adventure</button>
+        <button :class="['tab', homeTab==='stories'?'active':'']" @click="homeTab='stories'">Stories</button>
+      </div>
+
+      <div class="view-body">
+        <!-- CHATS TAB -->
+        <div v-if="homeTab==='chats'">
+          <div v-if="chats.length === 0" class="empty-state">
+            <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+            <p>No chats yet</p>
+            <span>Tap + to start a chat</span>
+          </div>
+          <div v-for="chat in chats" :key="chat.id" class="list-item" @click="openChat(chat)">
+            <div class="list-item-avatar multi" v-if="chat.botIds.length > 1">
+              <span>{{ chat.botIds.length }}</span>
+            </div>
+            <div class="list-item-avatar" v-else :style="getBotEmoji(chat.botIds[0]) ? {background:'var(--bg-tertiary)',fontSize:'26px'} : {background: getBotColor(chat.botIds[0])}">
+              {{ getBotEmoji(chat.botIds[0]) || getBotInitial(chat.botIds[0]) }}
+            </div>
+            <div class="list-item-body">
+              <div class="list-item-title">{{ chat.name }}</div>
+              <div class="list-item-sub">{{ chat.lastMessage || 'No messages yet' }}</div>
+            </div>
+            <div class="list-item-meta">
+              <span class="list-item-time">{{ formatTime(chat.updatedAt) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADVENTURE TAB -->
+        <div v-if="homeTab==='adventure'">
+          <div v-if="adventures.length === 0" class="empty-state">
+            <svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
+            <p>No adventures yet</p>
+            <span>Tap + to start an adventure</span>
+          </div>
+          <div v-for="adv in adventures" :key="adv.id" class="list-item" @click="openAdventure(adv)">
+            <div class="list-item-avatar adventure-avatar">
+              <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+            <div class="list-item-body">
+              <div class="list-item-title">{{ adv.name }}</div>
+              <div class="list-item-sub">{{ adv.scenario.substring(0,60) }}...</div>
+            </div>
+            <div class="list-item-meta">
+              <span class="list-item-time">{{ formatTime(adv.updatedAt) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- STORIES TAB -->
+        <div v-if="homeTab==='stories'">
+          <div v-if="stories.length === 0" class="empty-state">
+            <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-10 0H2v20h20V2h-4zm-6 0a3 3 0 010 6 3 3 0 010-6zm6 18H6V6h2v2h8V6h2v14z"/></svg>
+            <p>No stories yet</p>
+            <span>Tap + to generate a story</span>
+          </div>
+          <div v-for="story in stories" :key="story.id" class="list-item" @click="openStory(story)">
+            <div class="list-item-avatar story-avatar">
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            </div>
+            <div class="list-item-body">
+              <div class="list-item-title">{{ story.name }}</div>
+              <div class="list-item-sub">{{ story.scenario.substring(0,60) }}...</div>
+            </div>
+            <div class="list-item-meta">
+              <span class="list-item-time">{{ formatTime(story.updatedAt) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAB -->
+      <button class="fab" @click="openCreateModal()">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </button>
+    </div>
+
+    <!-- BOTS VIEW -->
+    <div v-else-if="view === 'bots'" class="view">
+      <div class="topbar">
+        <button class="icon-btn" @click="goBack()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <span class="topbar-title">Bot Manager</span>
+        <div class="topbar-actions">
+          <button class="icon-btn" @click="exportBots()">
+            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="view-body padded">
+        <button class="btn-primary full-width" @click="openBotModal()">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Create New Bot
+        </button>
+        <div v-if="bots.length === 0" class="empty-state">
+          <svg viewBox="0 0 24 24"><path d="M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4c1.66 0 3-1.34 3-3s-1.34-3-3-3zm-2 10H6V7h12v12zm-9-6c-.83 0-1.5-.67-1.5-1.5S8.17 10 9 10s1.5.67 1.5 1.5S9.83 13 9 13zm6 0c-.83 0-1.5-.67-1.5-1.5S14.17 10 15 10s1.5.67 1.5 1.5S15.83 13 15 13z"/></svg>
+          <p>No bots yet</p>
+          <span>Create your first bot above</span>
+        </div>
+        <div class="bot-grid">
+          <div v-for="bot in bots" :key="bot.id" class="bot-grid-card" @click="editBot(bot)">
+            <div class="bot-grid-avatar" :style="bot.emoji ? {background:'var(--bg-tertiary)',fontSize:'32px'} : {background: bot.color}">
+              {{ bot.emoji || bot.name[0].toUpperCase() }}
+            </div>
+            <div class="bot-grid-name">{{ bot.name }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIMPLE CHAT VIEW -->
+    <div v-else-if="view === 'chat'" class="view chat-view">
+      <div class="topbar">
+        <button class="icon-btn" @click="goBack()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <div class="topbar-chat-info">
+          <span class="topbar-title">{{ activeSession?.name }}</span>
+          <span class="topbar-sub">{{ activeBots.map(b=>b.name).join(', ') }}</span>
+        </div>
+        <div class="kebab-menu" ref="kebabMenuRef">
+          <button class="icon-btn" @click="chatMenu = !chatMenu">
+            <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </button>
+          <div v-if="chatMenu" class="kebab-dropdown">
+            <div class="kebab-item" @click="clearSession(); chatMenu = false">
+              <svg viewBox="0 0 24 24"><path d="M5 13h14v-2H5v2zm-2 4h14v-2H3v2zm4-10v2h14V7H7z"/></svg>
+              {{ kebabClearLabel }}
+            </div>
+            <div class="kebab-item danger" @click="kebabDelete(); chatMenu = false">
+              <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+              {{ kebabDeleteLabel }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="messages-area" ref="messagesArea">
+        <div v-if="activeMessages.length === 0" class="empty-chat">
+          <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+          <p>Say something!</p>
+        </div>
+        <div v-for="msg in activeMessages" :key="msg.id" :class="['message-row', msg.role === 'user' ? 'user-row' : 'bot-row']">
+          <div v-if="msg.role !== 'user'" class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+            {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
+          </div>
+          <div class="message-wrap">
+            <div v-if="msg.role !== 'user'" class="msg-name">{{ msg.botName }}</div>
+            <div :class="['message-bubble', msg.role === 'user' ? 'user-bubble' : 'bot-bubble']">
+              <span v-if="msg.typing" class="typing-dots"><span></span><span></span><span></span></span>
+              <span v-else>{{ msg.content }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- @mention suggestions -->
+      <div v-if="mentionSuggestions.length" class="mention-popup">
+        <div v-for="bot in mentionSuggestions" :key="bot.id" class="mention-item" @click="selectMention(bot)">
+          <div class="mention-avatar" :style="{background: bot.color}">{{ bot.name[0].toUpperCase() }}</div>
+          {{ bot.name }}
+        </div>
+      </div>
+      <div class="input-area">
+        <div class="chat-input-wrap">
+          <button class="at-btn" @click="insertAt" title="Mention a bot">@</button>
+          <input
+            class="chat-input"
+            v-model="inputText"
+            @input="onInput"
+            @keyup.enter="sendMessage"
+            placeholder="Message..."
+            ref="chatInput"
+          />
+        </div>
+        <button class="send-btn" @click="sendMessage" :disabled="isLoading || !inputText.trim()">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>    </div>
+
+    <!-- ADVENTURE VIEW -->
+    <div v-else-if="view === 'adventure'" class="view chat-view">
+      <div class="topbar">
+        <button class="icon-btn" @click="goBack()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <div class="topbar-chat-info">
+          <span class="topbar-title">{{ activeSession?.name }}</span>
+          <span class="topbar-sub adventure-badge">Adventure</span>
+        </div>
+        <div class="kebab-menu" ref="kebabMenuRef">
+          <button class="icon-btn" @click="chatMenu = !chatMenu">
+            <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </button>
+          <div v-if="chatMenu" class="kebab-dropdown">
+            <div class="kebab-item" @click="clearSession(); chatMenu = false">
+              <svg viewBox="0 0 24 24"><path d="M5 13h14v-2H5v2zm-2 4h14v-2H3v2zm4-10v2h14V7H7z"/></svg>
+              {{ kebabClearLabel }}
+            </div>
+            <div class="kebab-item danger" @click="kebabDelete(); chatMenu = false">
+              <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+              {{ kebabDeleteLabel }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="messages-area" ref="messagesArea">
+        <div class="scenario-banner">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span>{{ activeSession?.scenario }}</span>
+        </div>
+        <div v-for="msg in activeMessages" :key="msg.id" :class="['message-row', msg.role === 'user' ? 'user-row' : 'bot-row', msg.isDirector ? 'director-row' : '']">
+          <div v-if="msg.role !== 'user'" class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+            {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
+          </div>
+          <div v-if="msg.isDirector" class="msg-avatar director-avatar">
+            <svg viewBox="0 0 24 24"><path d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2z"/></svg>
+          </div>
+          <div class="message-wrap">
+            <div v-if="msg.role !== 'user'" class="msg-name">{{ msg.isDirector ? '🎬 Director' : msg.botName }}</div>
+            <div :class="['message-bubble', msg.role === 'user' ? 'user-bubble' : 'bot-bubble', msg.isDirector ? 'director-bubble' : '']">
+              <span v-if="msg.typing" class="typing-dots"><span></span><span></span><span></span></span>
+              <template v-else>
+                <template v-if="msg.isNarrator || msg.isDirector">
+                  <span>{{ msg.content }}</span>
+                </template>
+                <template v-else>
+                  <div v-for="(seg, si) in parseProseSegments(msg.content)" :key="si" :class="'prose-seg prose-' + seg.type">
+                    <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
+                  </div>
+                </template>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="directorMode" class="director-banner">        <svg viewBox="0 0 24 24"><path d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2z"/></svg>
+        Director Mode — pivot the story
+      </div>
+      <div class="input-area">
+        <button class="director-toggle-btn" :class="{active: directorMode}" @click="directorMode = !directorMode" title="Director Mode">
+          <svg viewBox="0 0 24 24"><path d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
+        </button>
+        <input
+          class="chat-input"
+          :class="{director: directorMode}"
+          v-model="inputText"
+          @keyup.enter="sendAdventureMessage"
+          :placeholder="directorMode ? 'Direct the story...' : 'What do you do?'"
+        />
+        <button class="send-btn" @click="sendAdventureMessage" :disabled="isLoading || !inputText.trim()">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- STORY VIEW -->
+    <div v-else-if="view === 'story'" class="view story-view">
+      <div class="topbar">
+        <button class="icon-btn" @click="goBack()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <span class="topbar-title">{{ activeSession?.name }}</span>
+        <div class="kebab-menu" ref="kebabMenuRef">
+          <button class="icon-btn" @click="chatMenu = !chatMenu">
+            <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </button>
+          <div v-if="chatMenu" class="kebab-dropdown">
+            <div class="kebab-item" @click="clearSession(); chatMenu = false">
+              <svg viewBox="0 0 24 24"><path d="M5 13h14v-2H5v2zm-2 4h14v-2H3v2zm4-10v2h14V7H7z"/></svg>
+              {{ kebabClearLabel }}
+            </div>
+            <div class="kebab-item danger" @click="kebabDelete(); chatMenu = false">
+              <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+              {{ kebabDeleteLabel }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="story-body" ref="storyBody">
+        <div class="story-scenario-header">
+          <h2>{{ activeSession?.name }}</h2>
+          <p class="story-premise">{{ activeSession?.scenario }}</p>
+        </div>
+        <div v-if="storyChunks.length === 0 && !isLoading" class="story-start">
+          <button class="btn-primary" @click="generateStoryChunk(true)">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            Begin Story
+          </button>
+        </div>
+        <div v-for="(chunk, idx) in storyChunks" :key="idx" :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : '']">
+          <template v-if="chunk.type === 'director'">
+            {{ chunk.content }}
+          </template>
+          <template v-else>
+            <div v-for="(seg, si) in parseProseSegments(chunk)" :key="si" :class="'prose-seg prose-' + seg.type + ' story-prose-seg'">
+              <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
+            </div>
+          </template>
+        </div>        
+        <div v-if="isLoading" class="story-loading">
+          <span class="typing-dots"><span></span><span></span><span></span></span>
+          Generating...
+        </div>
+        <div v-if="storyChunks.length > 0 && !isLoading" class="story-more-wrap">
+          <button class="btn-more" @click="generateStoryChunk(false)">
+            <svg viewBox="0 0 24 24"><path d="M19 11H7.83l4.88-4.88c.39-.39.39-1.03 0-1.42-.39-.39-1.02-.39-1.41 0l-6.59 6.59c-.39.39-.39 1.02 0 1.41l6.59 6.59c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L7.83 13H19c.55 0 1-.45 1-1s-.45-1-1-1z" transform="rotate(180 12 12)"/></svg>
+            Continue Story
+          </button>
+        </div>
+      </div>
+
+      <!-- FAB for Director Mode -->
+      <button v-if="!storyDirectorInput" class="story-fab" @click="storyDirectorInput = true" title="Direct the story">
+        <svg viewBox="0 0 24 24"><path d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
+      </button>
+
+      <!-- Director Input Bar -->
+      <div v-if="storyDirectorInput" class="story-director-input">
+        <button class="icon-btn" @click="storyDirectorInput = false; inputText = ''">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+        <input
+          type="text"
+          class="chat-input"
+          v-model="inputText"
+          @keydown.enter="sendStoryDirectorInput"
+          placeholder="Direct the story..."
+        />
+        <button class="send-btn" @click="sendStoryDirectorInput" :disabled="isLoading || !inputText.trim()">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>    </div>
+
+    <!-- MODALS -->
+    <!-- Create Modal -->
+    <div v-if="modal === 'create'" class="modal-overlay" @click.self="modal=null">
+      <div class="modal">
+        <div class="modal-title">New {{ homeTab === 'chats' ? 'Chat' : homeTab === 'adventure' ? 'Adventure' : 'Story' }}</div>
+        <input class="text-input" v-model="newSession.name" :placeholder="homeTab === 'chats' ? 'Chat name (optional)...' : homeTab === 'adventure' ? 'Adventure title...' : 'Story title...'" />
+        <div v-if="homeTab !== 'chats'">
+          <textarea class="text-input mt-sm" v-model="newSession.scenario" rows="3" placeholder="Describe the scenario, world, theme..."></textarea>
+        </div>
+
+        <div v-if="homeTab === 'adventure'">
+          <div class="settings-label mt-sm">Your Character</div>
+          <input class="text-input" v-model="newSession.characterName" placeholder="Your character's name..." />
+          <textarea class="text-input mt-sm" v-model="newSession.characterProfile" rows="2" placeholder="Describe your character..."></textarea>
+        </div>
+
+        <div class="settings-label mt-sm">Select Bots</div>
+        <div v-if="bots.length === 0" class="hint-text">No bots yet — create bots first!</div>
+        <div class="bot-selector">
+          <div
+            v-for="bot in bots"
+            :key="bot.id"
+            :class="['bot-chip', newSession.botIds.includes(bot.id) ? 'selected' : '']"
+            @click="toggleBotSelection(bot.id)"
+            :style="newSession.botIds.includes(bot.id) ? {borderColor: bot.color, background: bot.color+'22'} : {}"
+          >
+            <div class="chip-avatar" :style="{background: bot.color}">{{ bot.name[0].toUpperCase() }}</div>
+            {{ bot.name }}
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="modal=null">Cancel</button>
+          <button class="btn-primary" @click="createSession()" :disabled="(homeTab !== 'chats' && !newSession.name) || newSession.botIds.length === 0">Create</button>        </div>
+      </div>
+    </div>
+
+    <!-- Bot Edit Modal -->
+    <div v-if="modal === 'bot'" class="modal-overlay" @click.self="modal=null">
+      <div class="modal">
+        <div class="modal-title">{{ editingBot?.id ? 'Edit Bot' : 'New Bot' }}</div>
+        <div class="color-row">
+          <div class="bot-preview-avatar" :style="{background: editingBot.color}">
+            {{ editingBot.emoji ? editingBot.emoji : (editingBot.name ? editingBot.name[0].toUpperCase() : '?') }}
+          </div>
+          <div class="color-swatches">
+            <div v-for="c in botColors" :key="c" class="swatch" :style="{background: c}" :class="{selected: editingBot.color===c}" @click="editingBot.color=c"></div>
+          </div>
+        </div>
+        <div class="emoji-picker-section">
+          <div class="settings-label emoji-picker-label">Avatar Emoji <span class="emoji-clear-hint" v-if="editingBot.emoji" @click="editingBot.emoji=''">✕ Clear</span></div>
+          <div class="emoji-grid">
+            <span
+              v-for="em in botEmojis"
+              :key="em"
+              :class="['emoji-option', editingBot.emoji === em ? 'selected' : '']"
+              @click="editingBot.emoji = (editingBot.emoji === em ? '' : em)"
+            >{{ em }}</span>
+          </div>
+        </div>
+        <input class="text-input" v-model="editingBot.name" placeholder="Bot name..." />
+        <textarea class="text-input mt-sm" v-model="editingBot.persona" rows="5" placeholder="Describe this bot's personality, role, tone, traits..."></textarea>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="modal=null">Cancel</button>
+          <button v-if="editingBot.id" class="btn-danger" @click="deleteBotFromModal()">Delete</button>
+          <button class="btn-primary" @click="saveBot()" :disabled="!editingBot.name || !editingBot.persona">Save Bot</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div v-if="errorMsg" class="toast error">{{ errorMsg }}</div>
+
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="db.js"></script>
+  <script src="ai.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
