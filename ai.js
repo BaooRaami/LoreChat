@@ -44,17 +44,17 @@ function buildAdventureSystem(bots, scenario, characterName, characterProfile, i
 
   const formatRules = `
 RESPONSE FORMAT — wrap every part of your response in one of these tags:
-- [NARRATE]...[/NARRATE] — for scene-setting narration, atmosphere, world description
-- [ACTION]...[/ACTION] — for physical actions, movement, events happening in the world
-- [THOUGHT]...[/THOUGHT] — for a character's internal thoughts or feelings
-- [DIALOGUE]...[/DIALOGUE] — for spoken words only (what a character says out loud)
+- [Ⓝ]...[/Ⓝ] — for scene-setting narration, atmosphere, world description
+- [Ⓐ]...[/Ⓐ] — for physical actions, movement, events happening in the world
+- [Ⓣ]...[/Ⓣ] — for a character's internal thoughts or feelings
+- [Ⓓ]...[/Ⓓ] — for spoken words only (what a character says out loud)
 
 You MUST use these tags for every sentence. Do NOT mix tag types in one block.
 Example:
-[NARRATE]The inn was quiet, candles flickering in the draft.[/NARRATE]
-[ACTION]The hooded figure rose from the corner table.[/ACTION]
-[DIALOGUE]"I've been waiting for you," she said.[/DIALOGUE]
-[THOUGHT]Something about her eyes felt familiar...[/THOUGHT]`;
+[Ⓝ]The inn was quiet, candles flickering in the draft.[/Ⓝ]
+[Ⓐ]The hooded figure rose from the corner table.[/Ⓐ]
+[Ⓓ]"I've been waiting for you," she said.[/Ⓓ]
+[Ⓣ]Something about her eyes felt familiar...[/Ⓣ]`;
 
   if (isDirector) {
     return `You are the narrator and world engine of an interactive story.
@@ -122,10 +122,10 @@ RULES:
 - Write flowing prose but wrap every part in content tags:
 
 RESPONSE FORMAT — wrap every part in one of these tags:
-- [NARRATE]...[/NARRATE] — scene-setting, atmosphere, world description
-- [ACTION]...[/ACTION] — physical actions, movement, events
-- [THOUGHT]...[/THOUGHT] — a character's internal thoughts or feelings
-- [DIALOGUE]...[/DIALOGUE] — spoken words only
+- [Ⓝ]...[/Ⓝ] — scene-setting, atmosphere, world description
+- [Ⓐ]...[/Ⓐ] — physical actions, movement, events
+- [Ⓣ]...[/Ⓣ] — a character's internal thoughts or feelings
+- [Ⓓ]...[/Ⓓ] — spoken words only
 
 You MUST use these tags for every sentence. Do NOT use markdown, headers, or bullet points.`;
 }
@@ -134,7 +134,7 @@ You MUST use these tags for every sentence. Do NOT use markdown, headers, or bul
 // API CALL
 // ============================================================
 
-async function callAI(messages, systemPrompt, apiKey, model) {
+async function callAI(messages, systemPrompt, apiKey, model, onChunk = null) {
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
@@ -147,6 +147,7 @@ async function callAI(messages, systemPrompt, apiKey, model) {
         { role: 'system', content: systemPrompt },
         ...messages
       ],
+      stream: true,
       private: true
     })
   });
@@ -156,23 +157,45 @@ async function callAI(messages, systemPrompt, apiKey, model) {
     throw new Error(`API error ${res.status}: ${errText}`);
   }
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() || '';
-}
-// ============================================================
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    const lines = chunk.split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(data);
+        const piece = parsed.choices?.[0]?.delta?.content || '';
+        if (piece) {
+          fullText += piece;
+          if (onChunk) onChunk(piece, fullText);
+        }
+      } catch (e) { /* skip malformed lines */ }
+    }
+  }
+
+  return fullText.trim();
+}// ============================================================
 // MODE HANDLERS
 // ============================================================
 
-async function sendSimpleChat(history, bots, mentionedBotId, settings) {
+async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk = null) {  
   const systemPrompt = buildSimpleChatSystem(bots, mentionedBotId);
   const messages = history.map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
     content: m.role === 'user' ? m.content : `${m.botName}: ${m.content}`
   }));
 
-  const raw = await callAI(messages, systemPrompt, settings.apiKey, settings.model);
+  const raw = await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
 
-  // Parse response to extract bot name and content
+  // Parse response to extract bot name and content  
   const colonIdx = raw.indexOf(':');
   if (!mentionedBotId && colonIdx > 0 && colonIdx < 30) {
     const name = raw.substring(0, colonIdx).trim();
@@ -185,7 +208,7 @@ async function sendSimpleChat(history, bots, mentionedBotId, settings) {
   return { botId: bot.id, botName: bot.name, content: raw };
 }
 
-async function sendAdventureMessage(history, bots, session, isDirector, settings) {
+async function sendAdventureMessage(history, bots, session, isDirector, settings, onChunk = null) {  
   const systemPrompt = buildAdventureSystem(
     bots,
     session.scenario,
@@ -200,9 +223,9 @@ async function sendAdventureMessage(history, bots, session, isDirector, settings
     content: m.isDirector ? `[DIRECTOR]: ${m.content}` : m.content
   }));
 
-  const raw = await callAI(messages, systemPrompt, settings.apiKey, settings.model);
+  const raw = await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
 
-  // Parse narrator + character sections
+  // Parse narrator + character sections  
   const narratorMatch = raw.match(/\[NARRATOR\]:\s*([\s\S]*?)(?=\[[\w\s]+\]:|$)/i);
   const charMatch = raw.match(/\[([^\]]+)\]:\s*([\s\S]+)$/i);
 
@@ -228,7 +251,7 @@ async function sendAdventureMessage(history, bots, session, isDirector, settings
   };
 }
 
-async function generateStoryChunk(existingChunks, bots, session, settings, directorInput = null) {
+async function generateStoryChunk(existingChunks, bots, session, settings, directorInput = null, onChunk = null) {  
   const systemPrompt = buildStorySystem(bots, session.scenario, settings.storyChunkSize || 'medium');
 
   const messages = [];
@@ -244,6 +267,6 @@ async function generateStoryChunk(existingChunks, bots, session, settings, direc
     }
   }
 
-  return await callAI(messages, systemPrompt, settings.apiKey, settings.model);
-}
+  return await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
+  }
 const AI = { sendSimpleChat, sendAdventureMessage, generateStoryChunk };

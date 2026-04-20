@@ -360,7 +360,7 @@
           </div>
         </div>
       </div>
-      <div class="story-body" ref="storyBody">
+      <div class="story-body" ref="storyBody" @scroll="updateChunkNavState">        
         <div class="story-scenario-header">
           <h2>{{ activeSession?.name }}</h2>
           <p class="story-premise">{{ activeSession?.scenario }}</p>
@@ -372,14 +372,28 @@
           </button>
         </div>
         <div v-for="(chunk, idx) in storyChunks" :key="idx" :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : '']">
+          <div v-if="idx > 0 && chunk.type !== 'director'" :id="'divider-' + idx" class="story-chunk-divider"><span>✦</span></div>          
           <template v-if="chunk.type === 'director'">
             {{ chunk.content }}
           </template>
           <template v-else>
-            <div v-for="(seg, si) in parseProseSegments(chunk)" :key="si" :class="'prose-seg prose-' + seg.type + ' story-prose-seg'">
-              <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
-            </div>
-          </template>
+            <div v-for="(seg, si) in parseProseSegments(chunk)" :key="si" class="prose-seg-wrapper" :class="{ tapped: isTouchDevice && tappedSegKey === idx + '-' + si }" @click="handleSegTap(idx + '-' + si)">              
+              <div v-if="editingSegKey !== idx + '-' + si" :class="'prose-seg prose-' + seg.type + ' story-prose-seg'">
+                <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
+                <button class="prose-edit-btn" @click="startEditSegment(idx, si, seg)" title="Edit">
+                  <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                </button>
+              </div>
+              <div v-else class="prose-edit-inline">
+                <div class="settings-label">Edit text and tags:</div>
+                <textarea class="prose-edit-textarea" v-model="editSegText" rows="5"></textarea>
+                <div class="prose-edit-actions">
+                  <button class="btn-secondary" @click="cancelEdit()">Cancel</button>
+                  <button class="btn-primary" @click="saveSegmentEdit(idx, si, seg)">Save Changes</button>
+                </div>
+              </div>
+            </div>          
+            </template>
         </div>        
         <div v-if="isLoading" class="story-loading">
           <span class="typing-dots"><span></span><span></span><span></span></span>
@@ -393,7 +407,17 @@
         </div>
       </div>
 
-      <!-- FAB for Director Mode -->
+      <!-- Chunk Navigation -->
+      <div v-if="view === 'story' && storyChunks.filter(c => c.type !== 'director').length > 1" class="story-chunk-nav">
+        <button v-if="canNavUp" class="chunk-nav-btn" @click="scrollToChunkDivider('up')" title="Previous chapter">
+          <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+        </button>
+        <button v-if="canNavDown" class="chunk-nav-btn" @click="scrollToChunkDivider('down')" title="Next chapter">
+          <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </button>
+      </div>
+
+      <!-- FAB for Director Mode -->      
       <button v-if="!storyDirectorInput" class="story-fab" @click="storyDirectorInput = true" title="Direct the story">
         <svg viewBox="0 0 24 24"><path d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
       </button>

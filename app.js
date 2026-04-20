@@ -24,6 +24,13 @@ createApp({
     const directorMode = ref(false);
     const chatMenu = ref(false);
     const storyDirectorInput = ref(false);
+    const canNavUp = ref(false);
+    const canNavDown = ref(false);    
+    const editingSegKey = ref(null);
+    const editSegText = ref('');
+    const editSegType = ref('narrate');
+    const isTouchDevice = ref(false);
+    const tappedSegKey = ref(null);    
     // Data
     const bots = ref([]);
     const chats = ref([]);
@@ -81,26 +88,31 @@ createApp({
     }
 
     // ===== PROSE PARSER =====
+    // ===== PROSE PARSER =====
     function parseProseSegments(text) {
       if (!text) return [];
-      const tagOrder = ['NARRATE', 'ACTION', 'THOUGHT', 'DIALOGUE'];
-      const regex = /\[(NARRATE|ACTION|THOUGHT|DIALOGUE)\]([\s\S]*?)\[\/\1\]/gi;
+      const tagMap = { 'Ⓝ': 'narrate', 'Ⓐ': 'action', 'Ⓣ': 'thought', 'Ⓓ': 'dialogue' };
+      const regex = /\[(Ⓝ|Ⓐ|Ⓣ|Ⓓ)\]([\s\S]*?)\[\/\1\]/gi;
       const segments = [];
       let lastIndex = 0;
       let match;
       while ((match = regex.exec(text)) !== null) {
         if (match.index > lastIndex) {
           const plain = text.slice(lastIndex, match.index).trim();
-          if (plain) segments.push({ type: 'plain', text: plain });
+          if (plain) segments.push({ type: 'plain', text: plain, raw: plain });
         }
-        segments.push({ type: match[1].toLowerCase(), text: match[2].trim() });
+        segments.push({ 
+          type: tagMap[match[1]] || match[1].toLowerCase(), 
+          text: match[2].trim(), 
+          raw: match[0] 
+        });
         lastIndex = regex.lastIndex;
       }
       if (lastIndex < text.length) {
         const plain = text.slice(lastIndex).trim();
-        if (plain) segments.push({ type: 'plain', text: plain });
+        if (plain) segments.push({ type: 'plain', text: plain, raw: plain });
       }
-      return segments.length > 0 ? segments : [{ type: 'plain', text }];
+      return segments.length > 0 ? segments : [{ type: 'plain', text, raw: text }];
     }
 
     // ===== HELPERS =====    
@@ -145,6 +157,40 @@ createApp({
       });
     }
 
+    function updateChunkNavState() {
+      nextTick(() => {
+        const container = storyBody.value;
+        if (!container) return;
+        const dividers = container.querySelectorAll('.story-chunk-divider');
+        if (dividers.length === 0) { canNavUp.value = false; canNavDown.value = false; return; }
+        const scrollTop = container.scrollTop;
+        const containerHeight = container.clientHeight;
+        const threshold = 60;
+        canNavUp.value = Array.from(dividers).some(d => d.offsetTop < scrollTop + threshold);
+        canNavDown.value = Array.from(dividers).some(d => d.offsetTop > scrollTop + containerHeight - threshold);
+      });
+    }
+
+    function scrollToChunkDivider(direction) {
+      const container = storyBody.value;
+      if (!container) return;
+      const dividers = Array.from(container.querySelectorAll('.story-chunk-divider'));
+      if (dividers.length === 0) return;
+      const scrollTop = container.scrollTop;
+      const containerHeight = container.clientHeight;
+      const threshold = 60;
+      if (direction === 'up') {
+        const targets = dividers.filter(d => d.offsetTop < scrollTop + threshold - 10);
+        if (targets.length === 0) return;
+        const target = targets[targets.length - 1];
+        container.scrollTo({ top: target.offsetTop - 16, behavior: 'smooth' });
+      } else {
+        const target = dividers.find(d => d.offsetTop > scrollTop + containerHeight - threshold + 10);
+        if (!target) return;
+        container.scrollTo({ top: target.offsetTop - 16, behavior: 'smooth' });
+      }
+      setTimeout(updateChunkNavState, 400);
+    }
     // ===== NAVIGATION =====
     function navigate(target) {
       viewHistory.value.push(view.value);
@@ -324,7 +370,6 @@ createApp({
       const text = inputText.value.trim();
       if (!text || isLoading.value) return;
 
-      // Detect @mention in final text
       const mentionMatch = text.match(/@(\w[\w\s]*?)(?:\s|$)/);
       let resolvedMention = mentionedBot.value;
       if (mentionMatch && !resolvedMention) {
@@ -339,28 +384,38 @@ createApp({
       mentionSuggestions.value = [];
       scrollToBottom(messagesArea);
 
-      // Typing placeholder
-      const typingId = DB.generateId();
-      activeMessages.value.push({ id: typingId, role: 'bot', typing: true, botName: '...', botId: null });
+      const botMsgId = DB.generateId();
+      const botMsg = { id: botMsgId, role: 'bot', botId: null, botName: '...', content: '', streaming: true, ts: Date.now() };
+      activeMessages.value.push(botMsg);
       scrollToBottom(messagesArea);
       isLoading.value = true;
 
       try {
         const result = await AI.sendSimpleChat(
-          activeMessages.value.filter(m => !m.typing),
+          activeMessages.value.filter(m => !m.streaming),
           activeBots.value,
           resolvedMention ? resolvedMention.id : null,
-          settings.value
+          settings.value,
+          (piece, full) => {
+            const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
+            if (idx >= 0) {
+              activeMessages.value[idx] = { ...activeMessages.value[idx], content: full };
+            }
+            scrollToBottom(messagesArea);
+          }
         );
 
-        // Remove typing
-        const idx = activeMessages.value.findIndex(m => m.id === typingId);
-        if (idx >= 0) activeMessages.value.splice(idx, 1);
+        const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
+        if (idx >= 0) {
+          activeMessages.value[idx] = {
+            ...activeMessages.value[idx],
+            botId: result.botId,
+            botName: result.botName,
+            content: result.content,
+            streaming: false
+          };
+        }
 
-        const botMsg = { id: DB.generateId(), role: 'bot', botId: result.botId, botName: result.botName, content: result.content, ts: Date.now() };
-        activeMessages.value.push(botMsg);
-
-        // Persist
         activeSession.value.messages = [...activeMessages.value];
         activeSession.value.lastMessage = result.content.substring(0, 60);
         activeSession.value.updatedAt = Date.now();
@@ -368,7 +423,7 @@ createApp({
         await loadAll();
         scrollToBottom(messagesArea);
       } catch (err) {
-        const idx = activeMessages.value.findIndex(m => m.id === typingId);
+        const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
         if (idx >= 0) activeMessages.value.splice(idx, 1);
         showError('AI error: ' + err.message);
       }
@@ -392,24 +447,31 @@ createApp({
       inputText.value = '';
       scrollToBottom(messagesArea);
 
-      const typingId = DB.generateId();
-      activeMessages.value.push({ id: typingId, role: 'bot', typing: true, botName: '...', botId: null });
+      const botMsgId = DB.generateId();
+      const botMsg = { id: botMsgId, role: 'bot', botId: null, botName: '...', content: '', streaming: true, ts: Date.now() };
+      activeMessages.value.push(botMsg);
       scrollToBottom(messagesArea);
       isLoading.value = true;
 
       try {
         const result = await AI.sendAdventureMessage(
-          activeMessages.value.filter(m => !m.typing),
+          activeMessages.value.filter(m => !m.streaming),
           activeBots.value,
           activeSession.value,
           directorMode.value,
-          settings.value
+          settings.value,
+          (piece, full) => {
+            const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
+            if (idx >= 0) {
+              activeMessages.value[idx] = { ...activeMessages.value[idx], content: full };
+            }
+            scrollToBottom(messagesArea);
+          }
         );
 
-        const idx = activeMessages.value.findIndex(m => m.id === typingId);
+        const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
         if (idx >= 0) activeMessages.value.splice(idx, 1);
 
-        // Add narrator if present
         if (result.narrator) {
           activeMessages.value.push({
             id: DB.generateId(), role: 'bot', botId: null, botName: 'Narrator',
@@ -417,7 +479,6 @@ createApp({
           });
         }
 
-        // Add character response
         activeMessages.value.push({
           id: DB.generateId(), role: 'bot', botId: result.botId, botName: result.botName,
           content: result.content, isDirector: false, ts: Date.now()
@@ -429,7 +490,7 @@ createApp({
         await loadAll();
         scrollToBottom(messagesArea);
       } catch (err) {
-        const idx = activeMessages.value.findIndex(m => m.id === typingId);
+        const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
         if (idx >= 0) activeMessages.value.splice(idx, 1);
         showError('AI error: ' + err.message);
       }
@@ -446,28 +507,77 @@ createApp({
     async function generateStoryChunk(isFirst, directorInput = null) {
       if (isLoading.value) return;
       isLoading.value = true;
+
+      const streamingChunkIndex = storyChunks.value.length;
+      storyChunks.value.push({ type: 'streaming', content: '' });
+      scrollToBottom(storyBody);
+
       try {
-        // Filter out director chunks - only send actual story text to AI
-        const storyOnlyChunks = storyChunks.value.filter(c => typeof c === 'string' || !c.type);
+        const storyOnlyChunks = storyChunks.value.filter(c => typeof c === 'string' || (!c.type || c.type === 'streaming' ? false : c.type !== 'streaming'));
         const chunk = await AI.generateStoryChunk(
-          storyOnlyChunks,
+          storyChunks.value.filter(c => typeof c === 'string'),
           activeBots.value,
           activeSession.value,
           settings.value,
-          directorInput
+          directorInput,
+          (piece, full) => {
+            storyChunks.value[streamingChunkIndex] = { type: 'streaming', content: full };
+            scrollToBottom(storyBody);
+          }
         );
-        storyChunks.value.push(chunk);
+
+        storyChunks.value[streamingChunkIndex] = chunk;
         activeSession.value.chunks = [...storyChunks.value];
         activeSession.value.updatedAt = Date.now();
         await DB.putOne('stories', toPlain(activeSession.value));
         await loadAll();
         scrollToBottom(storyBody);
       } catch (err) {
+        storyChunks.value.splice(streamingChunkIndex, 1);
         showError('AI error: ' + err.message);
       }
       isLoading.value = false;
-    }    // ===== DELETE =====
-    async function deleteChat(id) {
+    }
+    // ===== STORY SEGMENT EDIT =====
+    function startEditSegment(chunkIdx, segIdx, seg) {
+      editingSegKey.value = `${chunkIdx}-${segIdx}`;
+      tappedSegKey.value = seg; // Store the segment object
+      editSegText.value = seg.raw; // Load the raw text including [Ⓝ]...[/Ⓝ]
+      modal.value = 'editProse';
+    }
+
+    function cancelEdit() {
+      editingSegKey.value = null;
+      editSegText.value = '';
+      editSegType.value = 'narrate';
+      tappedSegKey.value = null;
+    }
+
+    function handleSegTap(key) {
+      if (!isTouchDevice.value) return;
+      tappedSegKey.value = (tappedSegKey.value === key) ? null : key;
+    }
+    function handleSegTap(key) {
+      if (!isTouchDevice.value) return;
+      tappedSegKey.value = (tappedSegKey.value === key) ? null : key;
+    }
+    async function saveSegmentEdit(chunkIdx, segIdx, oldSeg) {
+      const newRaw = editSegText.value.trim();
+      const chunk = storyChunks.value[chunkIdx];
+      
+      if (typeof chunk === 'string') {
+        // This replaces the old text (including any broken tags) with your fix
+        storyChunks.value[chunkIdx] = chunk.replace(oldSeg.raw, newRaw);
+      }
+      
+      cancelEdit();
+      activeSession.value.chunks = [...storyChunks.value];
+      activeSession.value.updatedAt = Date.now();
+      await DB.putOne('stories', toPlain(activeSession.value));
+    }
+
+        // ===== DELETE =====    
+      async function deleteChat(id) {
       if (!confirm('Delete this chat?')) return;
       await DB.deleteOne('chats', id);
       await loadAll();
@@ -534,8 +644,10 @@ createApp({
 
     // ===== INIT =====
     onMounted(async () => {
+      isTouchDevice.value = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
       await loadAll();
-      document.addEventListener('click', (e) => {
+      watch(storyChunks, () => { setTimeout(updateChunkNavState, 300); }, { deep: true });      
+      document.addEventListener('click', (e) => {        
         if (chatMenu.value && kebabMenuRef.value && !kebabMenuRef.value.contains(e.target)) {
           chatMenu.value = false;
         }
@@ -560,6 +672,10 @@ createApp({
       openChat, clearSession, onInput, insertAt, selectMention, sendMessage,      
       openAdventure, sendAdventureMessage,
       openStory, generateStoryChunk, sendStoryDirectorInput, storyDirectorInput,
+      canNavUp, canNavDown, scrollToChunkDivider, updateChunkNavState,      
+      editingSegKey, editSegText, editSegType,
+      isTouchDevice, tappedSegKey,
+      startEditSegment, cancelEdit, saveSegmentEdit, handleSegTap,      
       deleteChat, deleteAdventure, deleteStory,
       exportAll, triggerImport, importAll    
     };
