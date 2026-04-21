@@ -546,6 +546,49 @@ createApp({
       modal.value = 'editProse';
     }
 
+        function insertProseTag(symbol, event) {
+      const ta = event.target.closest('.prose-edit-inline').querySelector('.prose-edit-textarea');
+      const val = ta.value;
+      const cursor = ta.selectionStart;
+
+      const openTag  = `[${symbol}]`;
+      const closeTag = `[/${symbol}]`;
+
+      // Search a small window around the cursor for any existing tag
+      const windowStart = Math.max(0, cursor - 6);
+      const windowEnd   = Math.min(val.length, cursor + 6);
+      const before = val.slice(0, windowEnd);
+
+      // Find the last '[' before cursor+6
+      const tagStart = before.lastIndexOf('[');
+      if (tagStart >= windowStart) {
+        // Find the next ']' from tagStart
+        const tagEnd = val.indexOf(']', tagStart);
+        if (tagEnd !== -1 && tagEnd <= windowEnd) {
+          // There is a tag-like chunk right around cursor — replace it
+          const existing = val.slice(tagStart, tagEnd + 1);
+          const replacement = (existing === openTag) ? closeTag : openTag;
+          const newVal = val.slice(0, tagStart) + replacement + val.slice(tagEnd + 1);
+          editSegText.value = newVal;
+          nextTick(() => {
+            ta.focus();
+            const newCursor = tagStart + replacement.length;
+            ta.setSelectionRange(newCursor, newCursor);
+          });
+          return;
+        }
+      }
+
+      // Nothing found nearby — insert fresh open tag at cursor
+      const newVal = val.slice(0, cursor) + openTag + val.slice(cursor);
+      editSegText.value = newVal;
+      nextTick(() => {
+        ta.focus();
+        const newCursor = cursor + openTag.length;
+        ta.setSelectionRange(newCursor, newCursor);
+      });
+    }
+
     function cancelEdit() {
       editingSegKey.value = null;
       editSegText.value = '';
@@ -652,6 +695,9 @@ createApp({
           chatMenu.value = false;
         }
       });
+      await nextTick();
+      document.getElementById('app-loader').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
     });
 
     return {
@@ -675,7 +721,7 @@ createApp({
       canNavUp, canNavDown, scrollToChunkDivider, updateChunkNavState,      
       editingSegKey, editSegText, editSegType,
       isTouchDevice, tappedSegKey,
-      startEditSegment, cancelEdit, saveSegmentEdit, handleSegTap,      
+      startEditSegment, cancelEdit, saveSegmentEdit, handleSegTap, insertProseTag,      
       deleteChat, deleteAdventure, deleteStory,
       exportAll, triggerImport, importAll    
     };

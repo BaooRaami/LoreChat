@@ -103,10 +103,10 @@ function buildStorySystem(bots, scenario, chunkSize) {
   ).join('\n');
 
   const lengthGuide = {
-    short: '1-2 paragraphs (150-250 words)',
-    medium: '2-3 paragraphs (250-400 words)',
-    long: '3-5 paragraphs (400-600 words)'
-  }[chunkSize] || '2-3 paragraphs (250-400 words)';
+    short: '1-2 paragraphs (100-200 words)',
+    medium: '2-3 paragraphs (200-300 words)',
+    long: '3-5 paragraphs (300-400 words)'
+  }[chunkSize] || '2-3 paragraphs (200-300 words)';
 
   return `You are a masterful storyteller writing an immersive story.
 Scenario: ${scenario}

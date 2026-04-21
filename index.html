@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="app-loader">
+    <div class="app-loader-spinner"></div>
+  </div>
   <div id="app">
 
     <!-- SETTINGS VIEW -->
@@ -387,6 +390,12 @@
               <div v-else class="prose-edit-inline">
                 <div class="settings-label">Edit text and tags:</div>
                 <textarea class="prose-edit-textarea" v-model="editSegText" rows="5"></textarea>
+                <div class="prose-tag-btns">
+                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓝ', $event)">Ⓝ</button>
+                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓐ', $event)">Ⓐ</button>
+                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓣ', $event)">Ⓣ</button>
+                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓓ', $event)">Ⓓ</button>
+                </div>
                 <div class="prose-edit-actions">
                   <button class="btn-secondary" @click="cancelEdit()">Cancel</button>
                   <button class="btn-primary" @click="saveSegmentEdit(idx, si, seg)">Save Changes</button>
