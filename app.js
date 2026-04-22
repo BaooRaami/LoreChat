@@ -89,10 +89,11 @@ createApp({
 
     // ===== PROSE PARSER =====
     // ===== PROSE PARSER =====
-    function parseProseSegments(text) {
+        function parseProseSegments(text) {
       if (!text) return [];
       const tagMap = { 'Ⓝ': 'narrate', 'Ⓐ': 'action', 'Ⓣ': 'thought', 'Ⓓ': 'dialogue' };
-      const regex = /\[(Ⓝ|Ⓐ|Ⓣ|Ⓓ)\]([\s\S]*?)\[\/\1\]/gi;
+      const symbols = Object.keys(tagMap).join('');
+      const regex = new RegExp(`([${symbols}])([\\s\\S]*?)\\1`, 'g');
       const segments = [];
       let lastIndex = 0;
       let match;
@@ -101,10 +102,10 @@ createApp({
           const plain = text.slice(lastIndex, match.index).trim();
           if (plain) segments.push({ type: 'plain', text: plain, raw: plain });
         }
-        segments.push({ 
-          type: tagMap[match[1]] || match[1].toLowerCase(), 
-          text: match[2].trim(), 
-          raw: match[0] 
+        segments.push({
+          type: tagMap[match[1]],
+          text: match[2].trim(),
+          raw: match[0]
         });
         lastIndex = regex.lastIndex;
       }
@@ -546,46 +547,15 @@ createApp({
       modal.value = 'editProse';
     }
 
-        function insertProseTag(symbol, event) {
+    function insertProseTag(symbol, event) {
       const ta = event.target.closest('.prose-edit-inline').querySelector('.prose-edit-textarea');
       const val = ta.value;
       const cursor = ta.selectionStart;
-
-      const openTag  = `[${symbol}]`;
-      const closeTag = `[/${symbol}]`;
-
-      // Search a small window around the cursor for any existing tag
-      const windowStart = Math.max(0, cursor - 6);
-      const windowEnd   = Math.min(val.length, cursor + 6);
-      const before = val.slice(0, windowEnd);
-
-      // Find the last '[' before cursor+6
-      const tagStart = before.lastIndexOf('[');
-      if (tagStart >= windowStart) {
-        // Find the next ']' from tagStart
-        const tagEnd = val.indexOf(']', tagStart);
-        if (tagEnd !== -1 && tagEnd <= windowEnd) {
-          // There is a tag-like chunk right around cursor — replace it
-          const existing = val.slice(tagStart, tagEnd + 1);
-          const replacement = (existing === openTag) ? closeTag : openTag;
-          const newVal = val.slice(0, tagStart) + replacement + val.slice(tagEnd + 1);
-          editSegText.value = newVal;
-          nextTick(() => {
-            ta.focus();
-            const newCursor = tagStart + replacement.length;
-            ta.setSelectionRange(newCursor, newCursor);
-          });
-          return;
-        }
-      }
-
-      // Nothing found nearby — insert fresh open tag at cursor
-      const newVal = val.slice(0, cursor) + openTag + val.slice(cursor);
+      const newVal = val.slice(0, cursor) + symbol + val.slice(cursor);
       editSegText.value = newVal;
       nextTick(() => {
         ta.focus();
-        const newCursor = cursor + openTag.length;
-        ta.setSelectionRange(newCursor, newCursor);
+        ta.setSelectionRange(cursor + symbol.length, cursor + symbol.length);
       });
     }
 

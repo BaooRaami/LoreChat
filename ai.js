@@ -44,17 +44,18 @@ function buildAdventureSystem(bots, scenario, characterName, characterProfile, i
 
   const formatRules = `
 RESPONSE FORMAT — wrap every part of your response in one of these tags:
-- [Ⓝ]...[/Ⓝ] — for scene-setting narration, atmosphere, world description
-- [Ⓐ]...[/Ⓐ] — for physical actions, movement, events happening in the world
-- [Ⓣ]...[/Ⓣ] — for a character's internal thoughts or feelings
-- [Ⓓ]...[/Ⓓ] — for spoken words only (what a character says out loud)
+- Ⓝ — for scene-setting narration, atmosphere, world description
+- Ⓐ — for physical actions, movement, events happening in the world
+- Ⓣ — for a character's internal thoughts or feelings
+- Ⓓ — for spoken words only (what a character says out loud)
 
-You MUST use these tags for every sentence. Do NOT mix tag types in one block.
+Use these symbols like bookends — same symbol opens and closes. Every sentence must be wrapped.
 Example:
-[Ⓝ]The inn was quiet, candles flickering in the draft.[/Ⓝ]
-[Ⓐ]The hooded figure rose from the corner table.[/Ⓐ]
-[Ⓓ]"I've been waiting for you," she said.[/Ⓓ]
-[Ⓣ]Something about her eyes felt familiar...[/Ⓣ]`;
+ⓃThe inn was quiet, candles flickering in the draft.Ⓝ
+ⒶThe hooded figure rose from the corner table.Ⓐ
+ⓉSomething about her eyes felt familiar...Ⓣ
+Ⓓ"I've been waiting for you," she said.Ⓓ
+`;
 
   if (isDirector) {
     return `You are the narrator and world engine of an interactive story.
@@ -121,13 +122,13 @@ RULES:
 - End each chunk at a natural pause point that makes the reader want more.
 - Write flowing prose but wrap every part in content tags:
 
-RESPONSE FORMAT — wrap every part in one of these tags:
-- [Ⓝ]...[/Ⓝ] — scene-setting, atmosphere, world description
-- [Ⓐ]...[/Ⓐ] — physical actions, movement, events
-- [Ⓣ]...[/Ⓣ] — a character's internal thoughts or feelings
-- [Ⓓ]...[/Ⓓ] — spoken words only
+RESPONSE FORMAT — same symbol opens and closes each segment:
+- Ⓝ...Ⓝ — scene-setting, atmosphere, world description
+- Ⓐ...Ⓐ — physical actions, movement, events
+- Ⓣ...Ⓣ — a character's internal thoughts or feelings
+- Ⓓ...Ⓓ — spoken words only
 
-You MUST use these tags for every sentence. Do NOT use markdown, headers, or bullet points.`;
+Every sentence must be wrapped. Do NOT use markdown, headers, or bullet points.`;
 }
 
 // ============================================================
