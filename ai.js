@@ -44,17 +44,13 @@ function buildAdventureSystem(bots, scenario, characterName, characterProfile, i
 
   const formatRules = `
 RESPONSE FORMAT — wrap every part of your response in one of these tags:
-- Ⓝ — for scene-setting narration, atmosphere, world description
-- Ⓐ — for physical actions, movement, events happening in the world
-- Ⓣ — for a character's internal thoughts or feelings
-- Ⓓ — for spoken words only (what a character says out loud)
 
-Use these symbols like bookends — same symbol opens and closes. Every sentence must be wrapped.
-Example:
-ⓃThe inn was quiet, candles flickering in the draft.Ⓝ
-ⒶThe hooded figure rose from the corner table.Ⓐ
-ⓉSomething about her eyes felt familiar...Ⓣ
-Ⓓ"I've been waiting for you," she said.Ⓓ
+- Use ⓃNARRATIONⓃ for setting the scene or describing the atmosphere.
+- Use ⒶACTIONSⒶ for physical movements. Use the verb (e.g., ⒶSighs deeplyⒶ) instead of "He sighs".
+- Use ⓉTHOUGHTSⓉ for internal monologue. Do NOT use quotation marks for thoughts.
+- Use ⒹDIALOGUEⒹ for spoken and speech words. How a person communicates with other.
+- Use these symbols like bookends — same symbol opens and closes. Every sentence must be wrapped.
+- Example: ⓃThe room is cold.Ⓝ ⒶShivers slightly,Ⓐ ⒹIt's freezing in here.Ⓓ ⓉI hope the heat comes on soon.Ⓣ
 `;
 
   if (isDirector) {
@@ -123,12 +119,13 @@ RULES:
 - Write flowing prose but wrap every part in content tags:
 
 RESPONSE FORMAT — same symbol opens and closes each segment:
-- Ⓝ...Ⓝ — scene-setting, atmosphere, world description
-- Ⓐ...Ⓐ — physical actions, movement, events
-- Ⓣ...Ⓣ — a character's internal thoughts or feelings
-- Ⓓ...Ⓓ — spoken words only
-
-Every sentence must be wrapped. Do NOT use markdown, headers, or bullet points.`;
+- Use ⓃNARRATIONⓃ for setting the scene or describing the atmosphere.
+- Use ⒶACTIONSⒶ for physical movements. Use the verb (e.g., ⒶSighs deeplyⒶ) instead of "He sighs".
+- Use ⓉTHOUGHTSⓉ for internal monologue. Do NOT use quotation marks for thoughts.
+- Use ⒹDIALOGUEⒹ for spoken and speech words. How a person communicates with other.
+- Use these symbols like bookends — same symbol opens and closes. Every sentence must be wrapped.
+- Example: ⓃThe room is cold.Ⓝ ⒶShivers slightly,Ⓐ ⒹIt's freezing in here.Ⓓ ⓉI hope the heat comes on soon.Ⓣ
+`;
 }
 
 // ============================================================

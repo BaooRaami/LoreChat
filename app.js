@@ -501,7 +501,7 @@ createApp({
     // ===== STORY =====
     function openStory(story) {
       activeSession.value = story;
-      storyChunks.value = story.chunks || [];
+      storyChunks.value = (story.chunks || []).filter(c => c !== null && c !== undefined);      
       navigate('story');
     }
 
