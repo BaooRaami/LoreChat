@@ -94,7 +94,7 @@ RULES:
 ${formatRules}`;
 }
 
-function buildStorySystem(bots, scenario, chunkSize) {
+function buildStorySystem(bots, scenario, chunkSize, summary) {
   const botList = bots.map(b =>
     `- ${b.name}: ${b.persona}`
   ).join('\n');
@@ -105,11 +105,16 @@ function buildStorySystem(bots, scenario, chunkSize) {
     long: '3-5 paragraphs (300-400 words)'
   }[chunkSize] || '2-3 paragraphs (200-300 words)';
 
+  const summaryBlock = summary
+    ? `\nSTORY SO FAR:\n${summary}\n\n- Do NOT repeat or re-introduce events already listed in the summary above.\n- Build upon them, advance the story forward.`
+    : '';
+
   return `You are a masterful storyteller writing an immersive story.
 Scenario: ${scenario}
 
 Characters in this story:
 ${botList}
+${summaryBlock}
 
 RULES:
 - Write the next part of the story: ${lengthGuide}.
@@ -249,15 +254,15 @@ async function sendAdventureMessage(history, bots, session, isDirector, settings
   };
 }
 
-async function generateStoryChunk(existingChunks, bots, session, settings, directorInput = null, onChunk = null) {  
-  const systemPrompt = buildStorySystem(bots, session.scenario, settings.storyChunkSize || 'medium');
+async function generateStoryChunk(existingChunks, bots, session, settings, directorInput = null, onChunk = null) {
+  const systemPrompt = buildStorySystem(bots, session.scenario, settings.storyChunkSize || 'medium', session.summary || null);
 
   const messages = [];
   if (existingChunks.length === 0) {
     messages.push({ role: 'user', content: directorInput || 'Begin the story.' });
   } else {
-    const storyContext = existingChunks.slice(-3).join('\n\n');
-    messages.push({ role: 'assistant', content: storyContext });
+    const lastChunk = existingChunks[existingChunks.length - 1];
+    messages.push({ role: 'assistant', content: lastChunk });
     if (directorInput) {
       messages.push({ role: 'user', content: `[DIRECTOR]: ${directorInput}` });
     } else {
@@ -266,5 +271,31 @@ async function generateStoryChunk(existingChunks, bots, session, settings, direc
   }
 
   return await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
-  }
-const AI = { sendSimpleChat, sendAdventureMessage, generateStoryChunk };
+}
+
+async function generateStorySummary(allChunks, bots, session, settings) {
+  const botList = bots.map(b => `- ${b.name}: ${b.persona}`).join('\n');
+  const chunkCount = allChunks.length;
+
+  const bulletTarget = chunkCount <= 3 ? '3 to 5' : chunkCount <= 8 ? '6 to 8' : '8 to 10';
+
+  const systemPrompt = `You are a story editor creating a concise memory summary for an AI storyteller.
+Scenario: ${session.scenario}
+
+Characters:
+${botList}
+
+RULES:
+- Write ${bulletTarget} bullet points summarizing ALL key events, character actions, and plot developments so far.
+- Each bullet is one crisp sentence. No fluff, no prose.
+- Focus on facts: who did what, what was revealed, what changed.
+- Compress older events, be slightly more detailed on recent ones.
+- Do NOT continue the story. Only summarize what has already happened.
+- Do NOT use markdown headers. Just bullet points starting with •`;
+
+  const storyText = allChunks.join('\n\n');
+  const messages = [{ role: 'user', content: `Summarize this story so far:\n\n${storyText}` }];
+
+  return await callAI(messages, systemPrompt, settings.apiKey, settings.model);
+}
+const AI = { sendSimpleChat, sendAdventureMessage, generateStoryChunk, generateStorySummary };

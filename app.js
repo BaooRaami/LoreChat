@@ -501,44 +501,56 @@ createApp({
     // ===== STORY =====
     function openStory(story) {
       activeSession.value = story;
-      storyChunks.value = (story.chunks || []).filter(c => c !== null && c !== undefined);      
+      storyChunks.value = (story.chunks || []).filter(c => c !== null && c !== undefined);
+      if (story.summary) activeSession.value.summary = story.summary;      
       navigate('story');
     }
 
     async function generateStoryChunk(isFirst, directorInput = null) {
-      if (isLoading.value) return;
-      isLoading.value = true;
+  if (isLoading.value) return;
+  isLoading.value = true;
 
-      const streamingChunkIndex = storyChunks.value.length;
-      storyChunks.value.push({ type: 'streaming', content: '' });
-      scrollToBottom(storyBody);
+  const streamingChunkIndex = storyChunks.value.length;
+  storyChunks.value.push({ type: 'streaming', content: '' });
+  scrollToBottom(storyBody);
 
-      try {
-        const storyOnlyChunks = storyChunks.value.filter(c => typeof c === 'string' || (!c.type || c.type === 'streaming' ? false : c.type !== 'streaming'));
-        const chunk = await AI.generateStoryChunk(
-          storyChunks.value.filter(c => typeof c === 'string'),
-          activeBots.value,
-          activeSession.value,
-          settings.value,
-          directorInput,
-          (piece, full) => {
-            storyChunks.value[streamingChunkIndex] = { type: 'streaming', content: full };
-            scrollToBottom(storyBody);
-          }
-        );
-
-        storyChunks.value[streamingChunkIndex] = chunk;
-        activeSession.value.chunks = [...storyChunks.value];
-        activeSession.value.updatedAt = Date.now();
-        await DB.putOne('stories', toPlain(activeSession.value));
-        await loadAll();
+  try {
+    const chunk = await AI.generateStoryChunk(
+      storyChunks.value.filter(c => typeof c === 'string'),
+      activeBots.value,
+      activeSession.value,
+      settings.value,
+      directorInput,
+      (piece, full) => {
+        storyChunks.value[streamingChunkIndex] = { type: 'streaming', content: full };
         scrollToBottom(storyBody);
-      } catch (err) {
-        storyChunks.value.splice(streamingChunkIndex, 1);
-        showError('AI error: ' + err.message);
       }
-      isLoading.value = false;
-    }
+    );
+
+    storyChunks.value[streamingChunkIndex] = chunk;
+    activeSession.value.chunks = [...storyChunks.value];
+    activeSession.value.updatedAt = Date.now();
+    await DB.putOne('stories', toPlain(activeSession.value));
+    await loadAll();
+    scrollToBottom(storyBody);
+
+    // Generate summary in background — do not await, user keeps reading
+    AI.generateStorySummary(
+      storyChunks.value.filter(c => typeof c === 'string'),
+      activeBots.value,
+      activeSession.value,
+      settings.value
+    ).then(async (summary) => {
+      activeSession.value.summary = summary;
+      await DB.putOne('stories', toPlain(activeSession.value));
+    }).catch(() => { /* summary failure is non-critical, silently ignore */ });
+
+  } catch (err) {
+    storyChunks.value.splice(streamingChunkIndex, 1);
+    showError('AI error: ' + err.message);
+  }
+  isLoading.value = false;
+}
     // ===== STORY SEGMENT EDIT =====
     function startEditSegment(chunkIdx, segIdx, seg) {
       editingSegKey.value = `${chunkIdx}-${segIdx}`;
