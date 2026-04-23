@@ -18,7 +18,27 @@ function openDB() {
         }
       });
     };
-    req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
+    req.onsuccess = async (e) => {
+      _db = e.target.result;
+      resolve(_db);
+      // Seed the "You" bot if it doesn't exist yet
+      const tx = _db.transaction('bots', 'readonly');
+      const req2 = tx.objectStore('bots').get('you-bot');
+      req2.onsuccess = () => {
+        if (!req2.result) {
+          const tx2 = _db.transaction('bots', 'readwrite');
+          tx2.objectStore('bots').put({
+            id: 'you-bot',
+            name: 'You',
+            persona: '',
+            color: '#5865f2',
+            emoji: '🧑',
+            isYou: true,
+            createdAt: Date.now()
+          });
+        }
+      };
+    };
     req.onerror = (e) => reject(e.target.error);
   });
 }

@@ -221,7 +221,7 @@ createApp({
 
     // ===== LOAD DATA =====
     async function loadAll() {
-      bots.value = await DB.getAll('bots');
+      bots.value = (await DB.getAll('bots')).sort((a, b) => (b.isYou ? 1 : 0) - (a.isYou ? 1 : 0));      
       chats.value = (await DB.getAll('chats')).sort((a, b) => b.updatedAt - a.updatedAt);
       adventures.value = (await DB.getAll('adventures')).sort((a, b) => b.updatedAt - a.updatedAt);
       stories.value = (await DB.getAll('stories')).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -266,7 +266,9 @@ createApp({
 
     // ===== CREATE SESSION =====
     function openCreateModal() {
-      newSession.value = { name: '', scenario: '', botIds: [], characterName: '', characterProfile: '' };
+      const youBot = bots.value.find(b => b.isYou);
+      const preSelected = ((homeTab.value === 'adventure' || homeTab.value === 'chats') && youBot) ? [youBot.id] : [];      
+      newSession.value = { name: '', scenario: '', botIds: preSelected, characterName: '', characterProfile: '' };
       modal.value = 'create';
     }
 
@@ -304,7 +306,8 @@ createApp({
         modal.value = null;
         openChat(session);
       } else if (homeTab.value === 'adventure') {
-        const session = { id, name: sessionName, scenario: ns.scenario, characterName: ns.characterName, characterProfile: ns.characterProfile, botIds: [...ns.botIds], messages: [], createdAt: now, updatedAt: now };
+        const youBot = bots.value.find(b => b.isYou);
+        const session = { id, name: sessionName, scenario: ns.scenario, characterName: youBot?.name || 'You', characterProfile: youBot?.persona || '', botIds: [...ns.botIds], messages: [], createdAt: now, updatedAt: now };        
         await DB.putOne('adventures', session);
         await loadAll();
         modal.value = null;

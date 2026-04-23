@@ -190,8 +190,8 @@
             <div class="bot-grid-avatar" :style="bot.emoji ? {background:'var(--bg-tertiary)',fontSize:'32px'} : {background: bot.color}">
               {{ bot.emoji || bot.name[0].toUpperCase() }}
             </div>
-            <div class="bot-grid-name">{{ bot.name }}</div>
-          </div>
+            <div class="bot-grid-name">{{ bot.name }}{{ bot.isYou ? ' (You)' : '' }}</div>          
+            </div>
         </div>
       </div>
     </div>
@@ -458,26 +458,20 @@
           <textarea class="text-input mt-sm" v-model="newSession.scenario" rows="3" placeholder="Describe the scenario, world, theme..."></textarea>
         </div>
 
-        <div v-if="homeTab === 'adventure'">
-          <div class="settings-label mt-sm">Your Character</div>
-          <input class="text-input" v-model="newSession.characterName" placeholder="Your character's name..." />
-          <textarea class="text-input mt-sm" v-model="newSession.characterProfile" rows="2" placeholder="Describe your character..."></textarea>
-        </div>
-
         <div class="settings-label mt-sm">Select Bots</div>
         <div v-if="bots.length === 0" class="hint-text">No bots yet — create bots first!</div>
         <div class="bot-selector">
           <div
             v-for="bot in bots"
             :key="bot.id"
-            :class="['bot-chip', newSession.botIds.includes(bot.id) ? 'selected' : '']"
-            @click="toggleBotSelection(bot.id)"
+            :class="['bot-chip', newSession.botIds.includes(bot.id) ? 'selected' : '', (bot.isYou && (homeTab === 'adventure' || homeTab === 'chats')) ? 'you-locked' : '']"
+            @click="(bot.isYou && (homeTab === 'adventure' || homeTab === 'chats')) ? null : toggleBotSelection(bot.id)"            
             :style="newSession.botIds.includes(bot.id) ? {borderColor: bot.color, background: bot.color+'22'} : {}"
           >
-            <div class="chip-avatar" :style="{background: bot.color}">{{ bot.name[0].toUpperCase() }}</div>
-            {{ bot.name }}
+            <div class="chip-avatar" :style="{background: bot.color}">{{ bot.emoji || bot.name[0].toUpperCase() }}</div>
+            {{ bot.name }}{{ bot.isYou ? ' (You)' : '' }}
           </div>
-        </div>
+        </div>        
         <div class="modal-actions">
           <button class="btn-secondary" @click="modal=null">Cancel</button>
           <button class="btn-primary" @click="createSession()" :disabled="(homeTab !== 'chats' && !newSession.name) || newSession.botIds.length === 0">Create</button>        </div>
@@ -511,7 +505,7 @@
         <textarea class="text-input mt-sm" v-model="editingBot.persona" rows="5" placeholder="Describe this bot's personality, role, tone, traits..."></textarea>
         <div class="modal-actions">
           <button class="btn-secondary" @click="modal=null">Cancel</button>
-          <button v-if="editingBot.id" class="btn-danger" @click="deleteBotFromModal()">Delete</button>
+          <button v-if="editingBot.id && !editingBot.isYou" class="btn-danger" @click="deleteBotFromModal()">Delete</button>          
           <button class="btn-primary" @click="saveBot()" :disabled="!editingBot.name || !editingBot.persona">Save Bot</button>
         </div>
       </div>
