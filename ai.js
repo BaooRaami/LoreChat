@@ -43,17 +43,19 @@ function buildAdventureSystem(bots, scenario, characterName, characterProfile, i
   ).join('\n\n');
 
   const formatRules = `
-RESPONSE FORMAT — wrap every part of your response in one of these tags:
+RESPONSE FORMAT — start every sentence with one of these prefixes:
 
-- Use ⓃNARRATIONⓃ for setting the scene or describing the atmosphere.
-- Use ⒶACTIONSⒶ for physical movements. Use the verb (e.g., ⒶSighs deeplyⒶ) instead of "He sighs".
-- Use ⓉTHOUGHTSⓉ for internal monologue. Do NOT use quotation marks for thoughts.
-- Use ⒹDIALOGUEⒹ for spoken and speech words. How a person communicates with other.
-- Use these symbols like bookends — same symbol opens and closes. Every sentence must be wrapped.
-- Example: ⓃThe room is cold.Ⓝ ⒶShivers slightly,Ⓐ ⒹIt's freezing in here.Ⓓ ⓉI hope the heat comes on soon.Ⓣ
-`;
+- NN for setting the scene or describing the atmosphere
+- AA for physical movements and actions
+- TT for internal monologue and thoughts (do NOT use quotation marks)
+- DD for spoken dialogue and speech
 
-  if (isDirector) {
+Rules:
+- Each sentence MUST start with one of these four prefixes (NN, AA, TT, DD)
+- Put the prefix at the very start, followed by a space, then the content
+- The prefix applies until the end of the sentence (period, exclamation mark, or question mark)
+- Example: NN The room is cold. AA Shivers slightly. DD It's freezing in here. TT I hope the heat comes on soon.
+`;  if (isDirector) {
     return `You are the narrator and world engine of an interactive story.
 The story world: ${scenario}
 
@@ -121,17 +123,19 @@ RULES:
 - Write in third-person narrative style, rich and descriptive.
 - Include character dialogue naturally woven into the narrative.
 - End each chunk at a natural pause point that makes the reader want more.
-- Write flowing prose but wrap every part in content tags:
+- Write flowing prose using the following format:
 
-RESPONSE FORMAT — same symbol opens and closes each segment:
-- Use ⓃNARRATIONⓃ for setting the scene or describing the atmosphere.
-- Use ⒶACTIONSⒶ for physical movements. Use the verb (e.g., ⒶSighs deeplyⒶ) instead of "He sighs".
-- Use ⓉTHOUGHTSⓉ for internal monologue. Do NOT use quotation marks for thoughts.
-- Use ⒹDIALOGUEⒹ for spoken and speech words. How a person communicates with other.
-- Use these symbols like bookends — same symbol opens and closes. Every sentence must be wrapped.
-- Example: ⓃThe room is cold.Ⓝ ⒶShivers slightly,Ⓐ ⒹIt's freezing in here.Ⓓ ⓉI hope the heat comes on soon.Ⓣ
-`;
-}
+RESPONSE FORMAT — start every sentence with one of these prefixes:
+- NN for setting the scene or describing the atmosphere
+- AA for physical movements and actions
+- TT for internal monologue and thoughts (do NOT use quotation marks)
+- DD for spoken dialogue and speech
+
+Rules:
+- Each sentence MUST start with one of these four prefixes (NN, AA, TT, DD)
+- Put the prefix at the very start, followed by a space, then the content
+- The prefix applies until the end of the sentence (period, exclamation mark, or question mark)
+- Example: NN The room is cold. AA Shivers slightly. DD It's freezing in here. TT I hope the heat comes on soon.`;}
 
 // ============================================================
 // API CALL

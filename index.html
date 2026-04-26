@@ -462,13 +462,13 @@
         <div v-if="bots.length === 0" class="hint-text">No bots yet — create bots first!</div>
         <div class="bot-selector">
           <div
-            v-for="bot in bots"
+            v-for="bot in bots.filter(b => !(b.isYou && homeTab === 'chats'))"
             :key="bot.id"
-            :class="['bot-chip', newSession.botIds.includes(bot.id) ? 'selected' : '', (bot.isYou && (homeTab === 'adventure' || homeTab === 'chats')) ? 'you-locked' : '']"
-            @click="(bot.isYou && (homeTab === 'adventure' || homeTab === 'chats')) ? null : toggleBotSelection(bot.id)"            
+            :class="['bot-chip', newSession.botIds.includes(bot.id) ? 'selected' : '', (bot.isYou && homeTab === 'adventure') ? 'you-locked' : '']"
+            @click="(bot.isYou && homeTab === 'adventure') ? null : toggleBotSelection(bot.id)"            
             :style="newSession.botIds.includes(bot.id) ? {borderColor: bot.color, background: bot.color+'22'} : {}"
-          >
-            <div class="chip-avatar" :style="{background: bot.color}">{{ bot.emoji || bot.name[0].toUpperCase() }}</div>
+          >            
+          <div class="chip-avatar" :style="{background: bot.color}">{{ bot.emoji || bot.name[0].toUpperCase() }}</div>
             {{ bot.name }}{{ bot.isYou ? ' (You)' : '' }}
           </div>
         </div>        

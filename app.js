@@ -88,34 +88,72 @@ createApp({
     }
 
     // ===== PROSE PARSER =====
-    // ===== PROSE PARSER =====
         function parseProseSegments(text) {
-      if (!text) return [];
-      const tagMap = { 'Ⓝ': 'narrate', 'Ⓐ': 'action', 'Ⓣ': 'thought', 'Ⓓ': 'dialogue' };
-      const symbols = Object.keys(tagMap).join('');
-      const regex = new RegExp(`([${symbols}])([\\s\\S]*?)\\1`, 'g');
-      const segments = [];
-      let lastIndex = 0;
-      let match;
-      while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          const plain = text.slice(lastIndex, match.index).trim();
-          if (plain) segments.push({ type: 'plain', text: plain, raw: plain });
+      // Handle objects with content property (streaming/director chunks)
+      if (typeof text === 'object' && text !== null) {
+        if (text.content) {
+          text = text.content;
+        } else {
+          return [{ type: 'plain', text: '', raw: '' }];
         }
-        segments.push({
-          type: tagMap[match[1]],
-          text: match[2].trim(),
-          raw: match[0]
-        });
-        lastIndex = regex.lastIndex;
       }
-      if (lastIndex < text.length) {
-        const plain = text.slice(lastIndex).trim();
-        if (plain) segments.push({ type: 'plain', text: plain, raw: plain });
+      
+      if (!text || typeof text !== 'string') return [];
+      
+      // PREPROCESSING: Fix spacing issues around tags
+      text = text.replace(/([a-zA-Z])(NN|AA|TT|DD)/g, '$1 $2'); // Add space before tag if stuck to word
+      text = text.replace(/(NN|AA|TT|DD)([a-zA-Z])/g, '$1 $2'); // Add space after tag if stuck to word
+      
+      const tagMap = { 
+        'NN': 'narrate', 
+        'AA': 'action', 
+        'TT': 'thought', 
+        'DD': 'dialogue' 
+      };
+      
+      const segments = [];
+      
+      // Find all tag positions in the text
+      const tagPattern = /\b(NN|AA|TT|DD)\s/g;
+      const matches = [];
+      let match;
+      
+      while ((match = tagPattern.exec(text)) !== null) {
+        matches.push({
+          tag: match[1],
+          index: match.index
+        });
+      }
+      
+      // If no tags found, return as plain text
+      if (matches.length === 0) {
+        return [{ type: 'plain', text: text.trim(), raw: text.trim() }];
+      }
+      
+      // Extract content between tags
+      for (let i = 0; i < matches.length; i++) {
+        const current = matches[i];
+        const next = matches[i + 1];
+        
+        // Get content from current tag to next tag (or end of text)
+        const startPos = current.index + current.tag.length + 1; // +1 for the space
+        const endPos = next ? next.index : text.length;
+        let content = text.substring(startPos, endPos).trim();
+        
+        // Strip opening/closing quotation marks from content
+        content = content.replace(/^["'""]|["'""]$/g, '');
+        
+        if (content) {
+          const rawText = text.substring(current.index, endPos).trim();
+          segments.push({
+            type: tagMap[current.tag],
+            text: content,
+            raw: rawText
+          });
+        }
       }
       return segments.length > 0 ? segments : [{ type: 'plain', text, raw: text }];
     }
-
     // ===== HELPERS =====    
     function getBotColor(botId) {
       const bot = bots.value.find(b => b.id === botId);
@@ -267,7 +305,7 @@ createApp({
     // ===== CREATE SESSION =====
     function openCreateModal() {
       const youBot = bots.value.find(b => b.isYou);
-      const preSelected = ((homeTab.value === 'adventure' || homeTab.value === 'chats') && youBot) ? [youBot.id] : [];      
+      const preSelected = (homeTab.value === 'adventure' && youBot) ? [youBot.id] : [];      
       newSession.value = { name: '', scenario: '', botIds: preSelected, characterName: '', characterProfile: '' };
       modal.value = 'create';
     }
