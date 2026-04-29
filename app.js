@@ -4,7 +4,7 @@ const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
 const BOT_EMOJIS = ['👨','👩','👧','👦','👶','🧑','👨‍🦱','👩‍🦱','👨‍🦰','👩‍🦰','👱‍♂️','👱‍♀️','👨‍🦳','👩‍🦳','👨‍🦲','👩‍🦲','🧔','👵','👴','👲','👳‍♂️','👳‍♀️','🧕','👮‍♂️','👮‍♀️','👷‍♂️','👷‍♀️','💂‍♂️','💂‍♀️','🕵️‍♂️','🕵️‍♀️','👨‍⚕️','👩‍⚕️','👨‍🌾','👩‍🌾','👨‍🍳','👩‍🍳','👨‍🎓','👩‍🎓','👨‍🎤','👩‍🎤','👨‍🏫','👩‍🏫','👨‍🏭','👩‍🏭','👨‍💻','👩‍💻','👨‍💼','👩‍💼','👨‍🔧','👩‍🔧','👨‍🔬','👩‍🔬','👨‍🎨','👩‍🎨','👨‍🚒','👩‍🚒','👨‍✈️','👩‍✈️','👨‍🚀','👩‍🚀','👨‍⚖️','👩‍⚖️','👰','🤵','👸','🤴','🤶','🎅','🧙‍♂️','🧙‍♀️','🧝‍♂️','🧝‍♀️','🧛‍♂️','🧛‍♀️','🧟‍♂️','🧟‍♀️','🧞‍♂️','🧞‍♀️','🧜‍♂️','🧜‍♀️','🧚‍♂️','🧚‍♀️','💃','🕺','🥷','🦸','🦹','🏇','⛷️','🏂','🏄','🚣','🏊','🏋️','🚴','⛹️','🦁','🐺','🐉','🦉','🦄','🐼','💎','⚔️','🛡️','🧪','📜','🔮','🦾'];
 
-const BOT_COLORS = [  
+const BOT_COLORS = [
   '#ff0000', '#ff4500', '#ff7043', '#ff6d00', '#f39c12', '#faa61a',
   '#fee75c', '#ffeb3b', '#c8e600', '#57f287', '#2ecc71', '#1abc9c',
   '#00e5ff', '#00b0f4', '#3498db', '#5865f2', '#7289da', '#9b59b6',
@@ -24,13 +24,14 @@ createApp({
     const directorMode = ref(false);
     const chatMenu = ref(false);
     const storyDirectorInput = ref(false);
+    const summaryModalOpen = ref(false);
     const canNavUp = ref(false);
-    const canNavDown = ref(false);    
+    const canNavDown = ref(false);
     const editingSegKey = ref(null);
     const editSegText = ref('');
     const editSegType = ref('narrate');
     const isTouchDevice = ref(false);
-    const tappedSegKey = ref(null);    
+    const tappedSegKey = ref(null);
     // Data
     const bots = ref([]);
     const chats = ref([]);
@@ -61,6 +62,12 @@ createApp({
     const importFile = ref(null);
     const kebabMenuRef = ref(null);
 
+    // ===== ICON HELPER =====
+    // Returns SVG string by name from the centralized icons.js library
+    function svg(name, className = '') {
+      return getIcon(name, className);
+    }
+
     // ===== COMPUTED =====
     const activeBots = computed(() => {
       if (!activeSession.value) return [];
@@ -88,7 +95,7 @@ createApp({
     }
 
     // ===== PROSE PARSER =====
-        function parseProseSegments(text) {
+    function parseProseSegments(text) {
       // Handle objects with content property (streaming/director chunks)
       if (typeof text === 'object' && text !== null) {
         if (text.content) {
@@ -97,52 +104,52 @@ createApp({
           return [{ type: 'plain', text: '', raw: '' }];
         }
       }
-      
+
       if (!text || typeof text !== 'string') return [];
-      
+
       // PREPROCESSING: Fix spacing issues around tags
       text = text.replace(/([a-zA-Z])(NN|AA|TT|DD)/g, '$1 $2'); // Add space before tag if stuck to word
       text = text.replace(/(NN|AA|TT|DD)([a-zA-Z])/g, '$1 $2'); // Add space after tag if stuck to word
-      
-      const tagMap = { 
-        'NN': 'narrate', 
-        'AA': 'action', 
-        'TT': 'thought', 
-        'DD': 'dialogue' 
+
+      const tagMap = {
+        'NN': 'narrate',
+        'AA': 'action',
+        'TT': 'thought',
+        'DD': 'dialogue'
       };
-      
+
       const segments = [];
-      
+
       // Find all tag positions in the text
       const tagPattern = /\b(NN|AA|TT|DD)\s/g;
       const matches = [];
       let match;
-      
+
       while ((match = tagPattern.exec(text)) !== null) {
         matches.push({
           tag: match[1],
           index: match.index
         });
       }
-      
+
       // If no tags found, return as plain text
       if (matches.length === 0) {
         return [{ type: 'plain', text: text.trim(), raw: text.trim() }];
       }
-      
+
       // Extract content between tags
       for (let i = 0; i < matches.length; i++) {
         const current = matches[i];
         const next = matches[i + 1];
-        
+
         // Get content from current tag to next tag (or end of text)
         const startPos = current.index + current.tag.length + 1; // +1 for the space
         const endPos = next ? next.index : text.length;
         let content = text.substring(startPos, endPos).trim();
-        
+
         // Strip opening/closing quotation marks from content
         content = content.replace(/^["'""]|["'""]$/g, '');
-        
+
         if (content) {
           const rawText = text.substring(current.index, endPos).trim();
           segments.push({
@@ -154,7 +161,7 @@ createApp({
       }
       return segments.length > 0 ? segments : [{ type: 'plain', text, raw: text }];
     }
-    // ===== HELPERS =====    
+    // ===== HELPERS =====
     function getBotColor(botId) {
       const bot = bots.value.find(b => b.id === botId);
       return bot ? bot.color : '#5865f2';
@@ -259,7 +266,7 @@ createApp({
 
     // ===== LOAD DATA =====
     async function loadAll() {
-      bots.value = (await DB.getAll('bots')).sort((a, b) => (b.isYou ? 1 : 0) - (a.isYou ? 1 : 0));      
+      bots.value = (await DB.getAll('bots')).sort((a, b) => (b.isYou ? 1 : 0) - (a.isYou ? 1 : 0));
       chats.value = (await DB.getAll('chats')).sort((a, b) => b.updatedAt - a.updatedAt);
       adventures.value = (await DB.getAll('adventures')).sort((a, b) => b.updatedAt - a.updatedAt);
       stories.value = (await DB.getAll('stories')).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -305,7 +312,7 @@ createApp({
     // ===== CREATE SESSION =====
     function openCreateModal() {
       const youBot = bots.value.find(b => b.isYou);
-      const preSelected = (homeTab.value === 'adventure' && youBot) ? [youBot.id] : [];      
+      const preSelected = (homeTab.value === 'adventure' && youBot) ? [youBot.id] : [];
       newSession.value = { name: '', scenario: '', botIds: preSelected, characterName: '', characterProfile: '' };
       modal.value = 'create';
     }
@@ -345,7 +352,7 @@ createApp({
         openChat(session);
       } else if (homeTab.value === 'adventure') {
         const youBot = bots.value.find(b => b.isYou);
-        const session = { id, name: sessionName, scenario: ns.scenario, characterName: youBot?.name || 'You', characterProfile: youBot?.persona || '', botIds: [...ns.botIds], messages: [], createdAt: now, updatedAt: now };        
+        const session = { id, name: sessionName, scenario: ns.scenario, characterName: youBot?.name || 'You', characterProfile: youBot?.persona || '', botIds: [...ns.botIds], messages: [], createdAt: now, updatedAt: now };
         await DB.putOne('adventures', session);
         await loadAll();
         modal.value = null;
@@ -400,7 +407,7 @@ createApp({
       nextTick(() => chatInput.value?.focus());
     }
 
-    function selectMention(bot) {      
+    function selectMention(bot) {
       const atIdx = inputText.value.lastIndexOf('@');
       inputText.value = inputText.value.substring(0, atIdx) + '@' + bot.name + ' ';
       mentionedBot.value = bot;
@@ -540,58 +547,62 @@ createApp({
     }
 
     // ===== STORY =====
+    function openSummaryModal() {
+      summaryModalOpen.value = true;
+    }
+
     function openStory(story) {
       activeSession.value = story;
       storyChunks.value = (story.chunks || []).filter(c => c !== null && c !== undefined);
-      if (story.summary) activeSession.value.summary = story.summary;      
+      if (story.summary) activeSession.value.summary = story.summary;
       navigate('story');
     }
 
     async function generateStoryChunk(isFirst, directorInput = null) {
-  if (isLoading.value) return;
-  isLoading.value = true;
+      if (isLoading.value) return;
+      isLoading.value = true;
 
-  const streamingChunkIndex = storyChunks.value.length;
-  storyChunks.value.push({ type: 'streaming', content: '' });
-  scrollToBottom(storyBody);
+      const streamingChunkIndex = storyChunks.value.length;
+      storyChunks.value.push({ type: 'streaming', content: '' });
+      scrollToBottom(storyBody);
 
-  try {
-    const chunk = await AI.generateStoryChunk(
-      storyChunks.value.filter(c => typeof c === 'string'),
-      activeBots.value,
-      activeSession.value,
-      settings.value,
-      directorInput,
-      (piece, full) => {
-        storyChunks.value[streamingChunkIndex] = { type: 'streaming', content: full };
+      try {
+        const chunk = await AI.generateStoryChunk(
+          storyChunks.value.filter(c => typeof c === 'string'),
+          activeBots.value,
+          activeSession.value,
+          settings.value,
+          directorInput,
+          (piece, full) => {
+            storyChunks.value[streamingChunkIndex] = { type: 'streaming', content: full };
+            scrollToBottom(storyBody);
+          }
+        );
+
+        storyChunks.value[streamingChunkIndex] = chunk;
+        activeSession.value.chunks = [...storyChunks.value];
+        activeSession.value.updatedAt = Date.now();
+        await DB.putOne('stories', toPlain(activeSession.value));
+        await loadAll();
         scrollToBottom(storyBody);
+
+        // Generate summary in background — do not await, user keeps reading
+        AI.generateStorySummary(
+          storyChunks.value.filter(c => typeof c === 'string'),
+          activeBots.value,
+          activeSession.value,
+          settings.value
+        ).then(async (summary) => {
+          activeSession.value.summary = summary;
+          await DB.putOne('stories', toPlain(activeSession.value));
+        }).catch(() => { /* summary failure is non-critical, silently ignore */ });
+
+      } catch (err) {
+        storyChunks.value.splice(streamingChunkIndex, 1);
+        showError('AI error: ' + err.message);
       }
-    );
-
-    storyChunks.value[streamingChunkIndex] = chunk;
-    activeSession.value.chunks = [...storyChunks.value];
-    activeSession.value.updatedAt = Date.now();
-    await DB.putOne('stories', toPlain(activeSession.value));
-    await loadAll();
-    scrollToBottom(storyBody);
-
-    // Generate summary in background — do not await, user keeps reading
-    AI.generateStorySummary(
-      storyChunks.value.filter(c => typeof c === 'string'),
-      activeBots.value,
-      activeSession.value,
-      settings.value
-    ).then(async (summary) => {
-      activeSession.value.summary = summary;
-      await DB.putOne('stories', toPlain(activeSession.value));
-    }).catch(() => { /* summary failure is non-critical, silently ignore */ });
-
-  } catch (err) {
-    storyChunks.value.splice(streamingChunkIndex, 1);
-    showError('AI error: ' + err.message);
-  }
-  isLoading.value = false;
-}
+      isLoading.value = false;
+    }
     // ===== STORY SEGMENT EDIT =====
     function startEditSegment(chunkIdx, segIdx, seg) {
       editingSegKey.value = `${chunkIdx}-${segIdx}`;
@@ -623,27 +634,24 @@ createApp({
       if (!isTouchDevice.value) return;
       tappedSegKey.value = (tappedSegKey.value === key) ? null : key;
     }
-    function handleSegTap(key) {
-      if (!isTouchDevice.value) return;
-      tappedSegKey.value = (tappedSegKey.value === key) ? null : key;
-    }
+
     async function saveSegmentEdit(chunkIdx, segIdx, oldSeg) {
       const newRaw = editSegText.value.trim();
       const chunk = storyChunks.value[chunkIdx];
-      
+
       if (typeof chunk === 'string') {
         // This replaces the old text (including any broken tags) with your fix
         storyChunks.value[chunkIdx] = chunk.replace(oldSeg.raw, newRaw);
       }
-      
+
       cancelEdit();
       activeSession.value.chunks = [...storyChunks.value];
       activeSession.value.updatedAt = Date.now();
       await DB.putOne('stories', toPlain(activeSession.value));
     }
 
-        // ===== DELETE =====    
-      async function deleteChat(id) {
+    // ===== DELETE =====
+    async function deleteChat(id) {
       if (!confirm('Delete this chat?')) return;
       await DB.deleteOne('chats', id);
       await loadAll();
@@ -664,18 +672,19 @@ createApp({
     async function sendStoryDirectorInput() {
       const text = inputText.value.trim();
       if (!text || isLoading.value) return;
-      
+
       // Add director message as a special chunk
       const directorChunk = { type: 'director', content: text };
       storyChunks.value.push(directorChunk);
-      
+
       inputText.value = '';
       storyDirectorInput.value = false;
       scrollToBottom(storyBody);
-      
+
       // Generate next chunk based on director input
       await generateStoryChunk(false, text);
-    }    // ===== IMPORT / EXPORT =====
+    }
+    // ===== IMPORT / EXPORT =====
     function downloadJSON(data, filename) {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -711,9 +720,13 @@ createApp({
     // ===== INIT =====
     onMounted(async () => {
       isTouchDevice.value = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+      // Inject CSS custom properties for background-image icons (prose watermarks)
+      injectIconStyles();
+
       await loadAll();
-      watch(storyChunks, () => { setTimeout(updateChunkNavState, 300); }, { deep: true });      
-      document.addEventListener('click', (e) => {        
+      watch(storyChunks, () => { setTimeout(updateChunkNavState, 300); }, { deep: true });
+      document.addEventListener('click', (e) => {
         if (chatMenu.value && kebabMenuRef.value && !kebabMenuRef.value.contains(e.target)) {
           chatMenu.value = false;
         }
@@ -732,21 +745,24 @@ createApp({
       messagesArea, storyBody, chatInput, importFile, kebabMenuRef,
       botColors: BOT_COLORS,
       botEmojis: BOT_EMOJIS,
-      getBotColor, getBotInitial, getBotEmoji, formatTime, parseProseSegments,      
+      getBotColor, getBotInitial, getBotEmoji, formatTime, parseProseSegments,
       kebabClearLabel, kebabDeleteLabel, kebabDelete,
       navigate, goBack,
       saveSettings,
-      openBotModal, editBot, saveBot, deleteBot, deleteBotFromModal, exportBots,      
+      openBotModal, editBot, saveBot, deleteBot, deleteBotFromModal, exportBots,
       openCreateModal, toggleBotSelection, createSession,
-      openChat, clearSession, onInput, insertAt, selectMention, sendMessage,      
+      openChat, clearSession, onInput, insertAt, selectMention, sendMessage,
       openAdventure, sendAdventureMessage,
       openStory, generateStoryChunk, sendStoryDirectorInput, storyDirectorInput,
-      canNavUp, canNavDown, scrollToChunkDivider, updateChunkNavState,      
+      canNavUp, canNavDown, scrollToChunkDivider, updateChunkNavState,
       editingSegKey, editSegText, editSegType,
       isTouchDevice, tappedSegKey,
-      startEditSegment, cancelEdit, saveSegmentEdit, handleSegTap, insertProseTag,      
+      startEditSegment, cancelEdit, saveSegmentEdit, handleSegTap, insertProseTag,
       deleteChat, deleteAdventure, deleteStory,
-      exportAll, triggerImport, importAll    
+      exportAll, triggerImport, importAll,
+      summaryModalOpen, openSummaryModal,
+      // Icon helper exposed to template
+      svg
     };
   }
 }).mount('#app');
