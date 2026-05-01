@@ -408,6 +408,7 @@ select.text-input { cursor: pointer; }
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   min-height: 200px;
+  flex-shrink: 0;
 }
 .prose-image.loaded { border-color: transparent; }
 .prose-image img {
@@ -463,6 +464,9 @@ select.text-input { cursor: pointer; }
 .prose-image:hover .image-remove-btn,
 .prose-image:hover .image-redo-btn,
 .prose-image:hover .image-reimagine-btn { opacity: 1; }
+
+.prose-image.streaming .image-prompt-overlay { opacity: 1; }
+.prompt-placeholder { opacity: 0.35; letter-spacing: 6px; display: block; text-align: center; margin: 8px 0; font-size: 18px; }
 .image-remove-btn { top: 8px; right: 8px; }
 .image-redo-btn { bottom: 8px; left: 8px; }
 .image-reimagine-btn { bottom: 8px; right: 8px; }
