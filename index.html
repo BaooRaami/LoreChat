@@ -253,10 +253,11 @@
           <!-- Adventure bot messages: split prose into standalone blocks, dialogue into bubbles -->
           <template v-if="view === 'adventure' && msg.role !== 'user' && !msg.isDirector && !msg.isNarrator">
             <!-- Image message -->
-            <div v-if="msg.isImage" class="prose-image" :class="{loaded: msg.imageUrl}">
+            <div v-if="msg.isImage" class="prose-image" :class="{loaded: msg.imageUrl, streaming: msg.isPromptStreaming}">
               <div class="image-prompt-overlay">
                 <div class="image-prompt-text">
-                  <span class="image-label">Generating Image...</span>
+                  <span class="image-label">{{ msg.isPromptStreaming ? 'Writing prompt...' : 'Generating Image...' }}</span>
+                  <span v-if="!msg.imagePrompt" class="prompt-placeholder">✦ ✦ ✦</span>
                   {{ msg.imagePrompt }}
                   <div v-if="!msg.imageUrl" class="image-spinner"></div>
                 </div>
@@ -339,13 +340,14 @@
         <div v-if="storyChunks.length === 0 && !isLoading" class="story-start">
           <p style="color: var(--text-muted); font-size: 15px;">Press the send button to begin your story</p>
         </div>
-        <div v-for="(chunk, idx) in storyChunks" :key="idx" :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : chunk.type === 'image' ? 'prose-image' : '', chunk.type === 'image' && chunk.imageUrl ? 'loaded' : '']">
-          <template v-if="chunk.type === 'image'">
+        <div v-for="(chunk, idx) in storyChunks" :key="idx" :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : (chunk.type === 'image' || chunk.type === 'prompt-streaming') ? 'prose-image' : '', (chunk.type === 'image' && chunk.imageUrl) ? 'loaded' : '', chunk.type === 'prompt-streaming' ? 'streaming' : '']">
+          <template v-if="chunk.type === 'image' || chunk.type === 'prompt-streaming'">
             <div class="image-prompt-overlay">
               <div class="image-prompt-text">
-                <span class="image-label">Generating Image...</span>
+                <span class="image-label">{{ chunk.type === 'prompt-streaming' ? 'Writing prompt...' : 'Generating Image...' }}</span>
+                <span v-if="!chunk.prompt" class="prompt-placeholder">✦ ✦ ✦</span>
                 {{ chunk.prompt }}
-                <div v-if="!chunk.imageUrl" class="image-spinner"></div>
+                <div v-if="chunk.type !== 'prompt-streaming'" class="image-spinner"></div>
               </div>
             </div>
             <img v-if="chunk.imageUrl" :src="chunk.imageUrl" alt="Generated scene" />
@@ -438,8 +440,11 @@
             ref="chatInput"
           />
         </div>
-        <button class="send-btn" @click="handleSend" :disabled="isLoading || (!inputDisabled && !inputText.trim())">
+        <button v-if="!isLoading" class="send-btn" @click="handleSend" :disabled="!inputDisabled && !inputText.trim()">
           <span v-html="svg('send')"></span>
+        </button>
+        <button v-else class="send-btn" @click="stopGeneration" style="background: var(--danger);">
+          <span v-html="svg('stop')"></span>
         </button>
       </div>
     </div>

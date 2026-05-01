@@ -141,54 +141,83 @@ Rules:
 // API CALL
 // ============================================================
 
+let _currentAbortController = null;
+
+function getAbortController() {
+  return _currentAbortController;
+}
+
+function createAbortController() {
+  _currentAbortController = new AbortController();
+  return _currentAbortController;
+}
+
+function abortCurrent() {
+  if (_currentAbortController) {
+    _currentAbortController.abort();
+    _currentAbortController = null;
+  }
+}
+
 async function callAI(messages, systemPrompt, apiKey, model, onChunk = null) {
+  const controller = createAbortController();
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-  const res = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: model || 'openai',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ],
-      stream: true,
-      private: true
-    })
-  });
+  try {
+    const res = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers,
+      body: JSON.stringify({
+        model: model || 'openai',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages
+        ],
+        stream: true,
+        private: true
+      })
+    });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`API error ${res.status}: ${errText}`);
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let fullText = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    const lines = chunk.split('\n');
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') continue;
-      try {
-        const parsed = JSON.parse(data);
-        const piece = parsed.choices?.[0]?.delta?.content || '';
-        if (piece) {
-          fullText += piece;
-          if (onChunk) onChunk(piece, fullText);
-        }
-      } catch (e) { /* skip malformed lines */ }
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`API error ${res.status}: ${errText}`);
     }
-  }
 
-  return fullText.trim();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          const piece = parsed.choices?.[0]?.delta?.content || '';
+          if (piece) {
+            fullText += piece;
+            if (onChunk) onChunk(piece, fullText);
+          }
+        } catch (e) { /* skip malformed lines */ }
+      }
+    }
+
+    return fullText.trim();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('ABORTED');
+    }
+    throw err;
+  } finally {
+    _currentAbortController = null;
+  }
 }
 
 // ============================================================
@@ -218,10 +247,10 @@ RULES:
 - Do NOT mention you are an AI. Just output the prompt.`;
 }
 
-async function generateImagePrompt(bots, scenario, summary, settings) {
+async function generateImagePrompt(bots, scenario, summary, settings, onChunk = null) {
   const systemPrompt = buildImagePromptSystem(bots, scenario, summary);
   const messages = [{ role: 'user', content: 'Generate an image prompt for the current scene.' }];
-  return await callAI(messages, systemPrompt, settings.apiKey, settings.model);
+  return await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
 }
 
 // ============================================================
@@ -337,4 +366,4 @@ RULES:
 
   return await callAI(messages, systemPrompt, settings.apiKey, settings.model);
 }
-const AI = { sendSimpleChat, sendAdventureMessage, generateStoryChunk, generateStorySummary, generateImagePrompt };
+const AI = { sendSimpleChat, sendAdventureMessage, generateStoryChunk, generateStorySummary, generateImagePrompt, abortCurrent };

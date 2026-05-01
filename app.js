@@ -2,7 +2,7 @@
 
 const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
-const BOT_EMOJIS = ['👨','👩','👧','👦','👶','🧑','👨‍🦱','👩‍🦱','👨‍🦰','👩‍🦰','👱‍♂️','👱‍♀️','👨‍🦳','👩‍🦳','👨‍🦲','👩‍🦲','🧔','👵','👴','👲','👳‍♂️','👳‍♀️','🧕','👮‍♂️','👮‍♀️','👷‍♂️','👷‍♀️','💂‍♂️','💂‍♀️','🕵️‍♂️','🕵️‍♀️','👨‍⚕️','👩‍⚕️','👨‍🌾','👩‍🌾','👨‍🍳','👩‍🍳','👨‍🎓','👩‍🎓','👨‍🎤','👩‍🎤','👨‍🏫','👩‍🏫','👨‍🏭','👩‍🏭','👨‍💻','👩‍💻','👨‍💼','👩‍💼','👨‍🔧','👩‍🔧','👨‍🔬','👩‍🔬','👨‍🎨','👩‍🎨','👨‍🚒','👩‍🚒','👨‍✈️','👩‍✈️','👨‍🚀','👩‍🚀','👨‍⚖️','👩‍⚖️','👰','🤵','👸','🤴','🤶','🎅','🧙‍♂️','🧙‍♀️','🧝‍♂️','🧝‍♀️','🧛‍♂️','🧛‍♀️','🧟‍♂️','🧟‍♀️','🧞‍♂️','🧞‍♀️','🧜‍♂️','🧜‍♀️','🧚‍♂️','🧚‍♀️','💃','🕺','🥷','🦸','🦹','🏇','⛷️','🏂','🏄','🚣','🏊','🏋️','🚴','⛹️','🦁','🐺','🐉','🦉','🦄','🐼','💎','⚔️','🛡️','🧪','📜','🔮','🦾'];
+const BOT_EMOJIS = ['👨', '👩', '👧', '👦', '👶', '🧑', '👨‍🦱', '👩‍🦱', '👨‍🦰', '👩‍🦰', '👱‍♂️', '👱‍♀️', '👨‍🦳', '👩‍🦳', '👨‍🦲', '👩‍🦲', '🧔', '👵', '👴', '👲', '👳‍♂️', '👳‍♀️', '🧕', '👮‍♂️', '👮‍♀️', '👷‍♂️', '👷‍♀️', '💂‍♂️', '💂‍♀️', '🕵️‍♂️', '🕵️‍♀️', '👨‍⚕️', '👩‍⚕️', '👨‍🌾', '👩‍🌾', '👨‍🍳', '👩‍🍳', '👨‍🎓', '👩‍🎓', '👨‍🎤', '👩‍🎤', '👨‍🏫', '👩‍🏫', '👨‍🏭', '👩‍🏭', '👨‍💻', '👩‍💻', '👨‍💼', '👩‍💼', '👨‍🔧', '👩‍🔧', '👨‍🔬', '👩‍🔬', '👨‍🎨', '👩‍🎨', '👨‍🚒', '👩‍🚒', '👨‍✈️', '👩‍✈️', '👨‍🚀', '👩‍🚀', '👨‍⚖️', '👩‍⚖️', '👰', '🤵', '👸', '🤴', '🤶', '🎅', '🧙‍♂️', '🧙‍♀️', '🧝‍♂️', '🧝‍♀️', '🧛‍♂️', '🧛‍♀️', '🧟‍♂️', '🧟‍♀️', '🧞‍♂️', '🧞‍♀️', '🧜‍♂️', '🧜‍♀️', '🧚‍♂️', '🧚‍♀️', '💃', '🕺', '🥷', '🦸', '🦹', '🏇', '⛷️', '🏂', '🏄', '🚣', '🏊', '🏋️', '🚴', '⛹️', '🦁', '🐺', '🐉', '🦉', '🦄', '🐼', '💎', '⚔️', '🛡️', '🧪', '📜', '🔮', '🦾'];
 
 const BOT_COLORS = [
   '#ff0000', '#ff4500', '#ff7043', '#ff6d00', '#f39c12', '#faa61a',
@@ -178,10 +178,11 @@ createApp({
       return bot ? bot.emoji || '' : '';
     }
 
-    function getImageUrl(prompt) {
+    function getImageUrl(prompt, seed) {
       const encoded = encodeURIComponent(prompt);
       const key = settings.value.apiKey ? `&key=${settings.value.apiKey}` : '';
-      return `https://gen.pollinations.ai/image/${encoded}?model=zimage&width=768&height=1152&private=true${key}`;
+      const seedParam = seed != null ? `&seed=${seed}` : '';
+      return `https://gen.pollinations.ai/image/${encoded}?model=zimage&width=768&height=1152&private=true${seedParam}${key}`;
     }
 
     function formatTime(ts) {
@@ -435,7 +436,7 @@ createApp({
 
       try {
         let imageEntry, prompt;
-        
+
         if (view.value === 'adventure') {
           const idx = activeMessages.value.findIndex(m => m.id === imageId);
           if (idx < 0) return;
@@ -450,7 +451,7 @@ createApp({
           storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl: null };
         }
 
-        const imageUrl = getImageUrl(prompt + '&seed=' + Date.now());
+        const imageUrl = getImageUrl(prompt, Math.floor(Math.random() * 2147483647));
 
         const img = new Image();
         img.onload = async () => {
@@ -484,7 +485,7 @@ createApp({
 
       try {
         let imageIdx;
-        
+
         if (view.value === 'adventure') {
           imageIdx = activeMessages.value.findIndex(m => m.id === imageId);
           if (imageIdx < 0) return;
@@ -508,7 +509,7 @@ createApp({
           storyChunks.value[imageIdx] = { ...storyChunks.value[imageIdx], prompt: newPrompt };
         }
 
-        const imageUrl = getImageUrl(newPrompt);
+        const imageUrl = getImageUrl(newPrompt, Math.floor(Math.random() * 2147483647));
 
         const img = new Image();
         img.onload = async () => {
@@ -556,43 +557,80 @@ createApp({
       }
     }
 
-    async function handleImageGenerate() {      
+    async function handleImageGenerate() {
       if (isGeneratingImage.value || isLoading.value) return;
       isGeneratingImage.value = true;
 
+      const tempTs = Date.now();
+
+      // 1. Push a streaming placeholder immediately so user sees feedback right away
+      const streamingEntry = { type: 'prompt-streaming', prompt: '', ts: tempTs };
+
+      if (view.value === 'adventure') {
+        activeMessages.value.push({
+          id: 'streaming-' + tempTs,
+          role: 'bot',
+          botId: null,
+          botName: 'Image',
+          content: '',
+          isImage: true,
+          isPromptStreaming: true,
+          imagePrompt: '',
+          imageUrl: null,
+          ts: tempTs
+        });
+        scrollToBottom(messagesArea);
+      } else if (view.value === 'story') {
+        storyChunks.value.push(streamingEntry);
+        scrollToBottom(storyBody);
+      }
+
       try {
+        // 2. Generate prompt with streaming — update the placeholder live
         const prompt = await AI.generateImagePrompt(
           activeBots.value,
           activeSession.value.scenario,
           activeSession.value.summary || null,
-          settings.value
+          settings.value,
+          (piece, full) => {
+            if (view.value === 'adventure') {
+              const idx = activeMessages.value.findIndex(m => m.ts === tempTs && m.isPromptStreaming);
+              if (idx >= 0) activeMessages.value[idx] = { ...activeMessages.value[idx], imagePrompt: full };
+            } else if (view.value === 'story') {
+              const idx = storyChunks.value.findIndex(c => c.ts === tempTs && c.type === 'prompt-streaming');
+              if (idx >= 0) storyChunks.value[idx] = { ...storyChunks.value[idx], prompt: full };
+            }
+          }
         );
 
-        const imageEntry = {
-          id: DB.generateId(),
-          type: 'image',
-          prompt: prompt,
-          imageUrl: null,
-          ts: Date.now()
-        };
+        const imageId = DB.generateId();
+        const imageTs = Date.now();
 
+        // 3. Replace streaming placeholder with real image entry (no URL yet)
         if (view.value === 'adventure') {
-          activeMessages.value.push({
-            id: imageEntry.id,
+          const idx = activeMessages.value.findIndex(m => m.ts === tempTs && m.isPromptStreaming);
+          const realEntry = {
+            id: imageId,
             role: 'bot',
             botId: null,
             botName: 'Image',
             content: '',
             isImage: true,
+            isPromptStreaming: false,
             imagePrompt: prompt,
             imageUrl: null,
-            ts: imageEntry.ts
-          });
+            ts: imageTs
+          };
+          if (idx >= 0) activeMessages.value.splice(idx, 1, realEntry);
+          else activeMessages.value.push(realEntry);
           activeSession.value.messages = [...activeMessages.value];
           activeSession.value.updatedAt = Date.now();
           await DB.putOne('adventures', toPlain(activeSession.value));
         } else if (view.value === 'story') {
-          storyChunks.value.push({ type: 'image', prompt: prompt, imageUrl: null, ts: imageEntry.ts });
+          const idx = storyChunks.value.findIndex(c => c.ts === tempTs && c.type === 'prompt-streaming');
+          const realEntry = { type: 'image', prompt, imageUrl: null, ts: imageTs };
+          if (idx >= 0) storyChunks.value.splice(idx, 1, realEntry);
+          else storyChunks.value.push(realEntry);
           activeSession.value.chunks = [...storyChunks.value];
           activeSession.value.updatedAt = Date.now();
           await DB.putOne('stories', toPlain(activeSession.value));
@@ -602,23 +640,18 @@ createApp({
         if (view.value === 'adventure') scrollToBottom(messagesArea);
         else scrollToBottom(storyBody);
 
-        const imageUrl = getImageUrl(prompt);
-
-        // Wait for the image to actually load before showing it
+        // 4. Load actual image in background
+        const imageUrl = getImageUrl(prompt, Math.floor(Math.random() * 2147483647));
         const img = new Image();
         img.onload = async () => {
           if (view.value === 'adventure') {
-            const idx = activeMessages.value.findIndex(m => m.id === imageEntry.id);
-            if (idx >= 0) {
-              activeMessages.value[idx] = { ...activeMessages.value[idx], imageUrl };
-            }
+            const idx = activeMessages.value.findIndex(m => m.id === imageId);
+            if (idx >= 0) activeMessages.value[idx] = { ...activeMessages.value[idx], imageUrl };
             activeSession.value.messages = [...activeMessages.value];
             await DB.putOne('adventures', toPlain(activeSession.value));
           } else if (view.value === 'story') {
-            const idx = storyChunks.value.findIndex(c => c.ts === imageEntry.ts && c.type === 'image');
-            if (idx >= 0) {
-              storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl };
-            }
+            const idx = storyChunks.value.findIndex(c => c.ts === imageTs && c.type === 'image');
+            if (idx >= 0) storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl };
             activeSession.value.chunks = [...storyChunks.value];
             await DB.putOne('stories', toPlain(activeSession.value));
           }
@@ -626,6 +659,14 @@ createApp({
         };
         img.src = imageUrl;
       } catch (err) {
+        // Clean up the streaming placeholder on error
+        if (view.value === 'adventure') {
+          const idx = activeMessages.value.findIndex(m => m.ts === tempTs && m.isPromptStreaming);
+          if (idx >= 0) activeMessages.value.splice(idx, 1);
+        } else if (view.value === 'story') {
+          const idx = storyChunks.value.findIndex(c => c.ts === tempTs && c.type === 'prompt-streaming');
+          if (idx >= 0) storyChunks.value.splice(idx, 1);
+        }
         showError('Image generation error: ' + err.message);
       }
       isGeneratingImage.value = false;
@@ -637,13 +678,17 @@ createApp({
     }
 
     async function handleSend() {
-      if (view.value === 'chat') {        
+      if (view.value === 'chat') {
         await sendMessage();
       } else if (view.value === 'adventure') {
         await sendAdventureMessage();
       } else if (view.value === 'story') {
         await sendStoryMessage();
       }
+    }
+
+    function stopGeneration() {
+      AI.abortCurrent();
     }
 
     async function sendMessage() {
@@ -704,8 +749,22 @@ createApp({
         scrollToBottom(messagesArea);
       } catch (err) {
         const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
-        if (idx >= 0) activeMessages.value.splice(idx, 1);
-        showError('AI error: ' + err.message);
+        if (idx >= 0) {
+          const finalContent = activeMessages.value[idx].content.trim();
+          if (finalContent) {
+            activeMessages.value[idx] = { ...activeMessages.value[idx], streaming: false };
+            activeSession.value.messages = [...activeMessages.value];
+            activeSession.value.lastMessage = finalContent.substring(0, 60);
+            activeSession.value.updatedAt = Date.now();
+            await DB.putOne('chats', toPlain(activeSession.value));
+            await loadAll();
+          } else {
+            activeMessages.value.splice(idx, 1);
+          }
+        }
+        if (err.message !== 'ABORTED') {
+          showError('AI error: ' + err.message);
+        }
       }
       isLoading.value = false;
     }
@@ -772,8 +831,21 @@ createApp({
         scrollToBottom(messagesArea);
       } catch (err) {
         const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
-        if (idx >= 0) activeMessages.value.splice(idx, 1);
-        showError('AI error: ' + err.message);
+        if (idx >= 0) {
+          const finalContent = activeMessages.value[idx].content.trim();
+          if (finalContent) {
+            activeMessages.value[idx] = { ...activeMessages.value[idx], streaming: false };
+            activeSession.value.messages = [...activeMessages.value];
+            activeSession.value.updatedAt = Date.now();
+            await DB.putOne('adventures', toPlain(activeSession.value));
+            await loadAll();
+          } else {
+            activeMessages.value.splice(idx, 1);
+          }
+        }
+        if (err.message !== 'ABORTED') {
+          showError('AI error: ' + err.message);
+        }
       }
       isLoading.value = false;
     }
@@ -863,8 +935,19 @@ createApp({
         }).catch(() => { /* silently ignore */ });
 
       } catch (err) {
-        storyChunks.value.splice(streamingChunkIndex, 1);
-        showError('AI error: ' + err.message);
+        const finalContent = storyChunks.value[streamingChunkIndex]?.content?.trim();
+        if (finalContent) {
+          storyChunks.value[streamingChunkIndex] = finalContent;
+          activeSession.value.chunks = [...storyChunks.value];
+          activeSession.value.updatedAt = Date.now();
+          await DB.putOne('stories', toPlain(activeSession.value));
+          await loadAll();
+        } else {
+          storyChunks.value.splice(streamingChunkIndex, 1);
+        }
+        if (err.message !== 'ABORTED') {
+          showError('AI error: ' + err.message);
+        }
       }
       isLoading.value = false;
     }
@@ -1046,6 +1129,7 @@ createApp({
       exportAll, triggerImport, importAll,
       summaryModalOpen, openSummaryModal,
       handleSend, handleImageGenerate, redoImage, reimagineImage, removeImage, isGeneratingImage, getImageUrl,
+      stopGeneration,
       toggleDirector, svg
     };
   }
