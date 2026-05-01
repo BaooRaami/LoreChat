@@ -198,165 +198,32 @@
       </div>
     </div>
 
-    <!-- SIMPLE CHAT VIEW -->
-    <div v-else-if="view === 'chat'" class="view chat-view">
+    <!-- ===== UNIFIED CHAT/ADVENTURE/STORY VIEW ===== -->
+    <div v-else-if="view === 'chat' || view === 'adventure' || view === 'story'" :class="['view', view === 'chat' ? 'chat-view' : view === 'story' ? 'story-view' : '']">
       <div class="topbar">
         <button class="icon-btn" @click="goBack()">
           <span v-html="svg('arrowBack')"></span>
         </button>
         <div class="topbar-chat-info">
-          <span class="topbar-title">{{ activeSession?.name }}</span>
-          <span class="topbar-sub">{{ activeBots.map(b=>b.name).join(', ') }}</span>
+          <div class="topbar-title-row">
+            <span class="topbar-title">{{ activeSession?.name }}</span>
+            <span v-if="view === 'chat'" class="badge-pill badge-chat">
+              <span v-html="svg('emptyChat')"></span> Chat
+            </span>
+            <span v-if="view === 'adventure'" class="badge-pill badge-adventure">
+              <span v-html="svg('star')"></span> Adventure
+            </span>
+            <span v-if="view === 'story'" class="badge-pill badge-story">
+              <span v-html="svg('summary')"></span> Story
+            </span>
+          </div>
         </div>
         <div class="kebab-menu" ref="kebabMenuRef">
           <button class="icon-btn" @click="chatMenu = !chatMenu">
             <span v-html="svg('kebab')"></span>
           </button>
           <div v-if="chatMenu" class="kebab-dropdown">
-            <div class="kebab-item" @click="clearSession(); chatMenu = false">
-              <span v-html="svg('clear')"></span>
-              {{ kebabClearLabel }}
-            </div>
-            <div class="kebab-item danger" @click="kebabDelete(); chatMenu = false">
-              <span v-html="svg('delete')"></span>
-              {{ kebabDeleteLabel }}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="messages-area" ref="messagesArea">
-        <div v-if="activeMessages.length === 0" class="empty-chat">
-          <span v-html="svg('emptyChat')"></span>
-          <p>Say something!</p>
-        </div>
-        <div v-for="msg in activeMessages" :key="msg.id" :class="['message-row', msg.role === 'user' ? 'user-row' : 'bot-row']">
-          <div v-if="msg.role !== 'user'" class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
-            {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
-          </div>
-          <div class="message-wrap">
-            <div v-if="msg.role !== 'user'" class="msg-name">{{ msg.botName }}</div>
-            <div :class="['message-bubble', msg.role === 'user' ? 'user-bubble' : 'bot-bubble']">
-              <span v-if="msg.typing" class="typing-dots"><span></span><span></span><span></span></span>
-              <span v-else>{{ msg.content }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- @mention suggestions -->
-      <div v-if="mentionSuggestions.length" class="mention-popup">
-        <div v-for="bot in mentionSuggestions" :key="bot.id" class="mention-item" @click="selectMention(bot)">
-          <div class="mention-avatar" :style="{background: bot.color}">{{ bot.name[0].toUpperCase() }}</div>
-          {{ bot.name }}
-        </div>
-      </div>
-      <div class="input-area">
-        <div class="chat-input-wrap">
-          <button class="at-btn" @click="insertAt" title="Mention a bot">@</button>
-          <input
-            class="chat-input"
-            v-model="inputText"
-            @input="onInput"
-            @keyup.enter="sendMessage"
-            placeholder="Message..."
-            ref="chatInput"
-          />
-        </div>
-        <button class="send-btn" @click="sendMessage" :disabled="isLoading || !inputText.trim()">
-          <span v-html="svg('send')"></span>
-        </button>
-      </div>
-    </div>
-
-    <!-- ADVENTURE VIEW -->
-    <div v-else-if="view === 'adventure'" class="view chat-view">
-      <div class="topbar">
-        <button class="icon-btn" @click="goBack()">
-          <span v-html="svg('arrowBack')"></span>
-        </button>
-        <div class="topbar-chat-info">
-          <span class="topbar-title">{{ activeSession?.name }}</span>
-          <span class="topbar-sub adventure-badge">Adventure</span>
-        </div>
-        <div class="kebab-menu" ref="kebabMenuRef">
-          <button class="icon-btn" @click="chatMenu = !chatMenu">
-            <span v-html="svg('kebab')"></span>
-          </button>
-          <div v-if="chatMenu" class="kebab-dropdown">
-            <div class="kebab-item" @click="clearSession(); chatMenu = false">
-              <span v-html="svg('clear')"></span>
-              {{ kebabClearLabel }}
-            </div>
-            <div class="kebab-item danger" @click="kebabDelete(); chatMenu = false">
-              <span v-html="svg('delete')"></span>
-              {{ kebabDeleteLabel }}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="messages-area" ref="messagesArea">
-        <div class="scenario-banner">
-          <span v-html="svg('star')"></span>
-          <span>{{ activeSession?.scenario }}</span>
-        </div>
-        <div v-for="msg in activeMessages" :key="msg.id" :class="['message-row', msg.role === 'user' ? 'user-row' : 'bot-row', msg.isDirector ? 'director-row' : '']">
-          <div v-if="msg.role !== 'user' && !msg.isDirector" class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
-            {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
-          </div>
-          <div v-if="msg.isDirector" class="msg-avatar director-avatar">
-            <span v-html="svg('director')"></span>
-          </div>
-          <div class="message-wrap">
-            <div v-if="msg.role !== 'user'" class="msg-name">{{ msg.isDirector ? '🎬 Director' : msg.botName }}</div>
-            <div :class="['message-bubble', msg.role === 'user' ? 'user-bubble' : 'bot-bubble', msg.isDirector ? 'director-bubble' : '']">
-              <span v-if="msg.typing" class="typing-dots"><span></span><span></span><span></span></span>
-              <template v-else>
-                <template v-if="msg.isNarrator || msg.isDirector">
-                  <span>{{ msg.content }}</span>
-                </template>
-                <template v-else>
-                  <div v-for="(seg, si) in parseProseSegments(msg.content)" :key="si" :class="'prose-seg prose-' + seg.type">
-                    <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
-                  </div>
-                </template>
-              </template>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div v-if="directorMode" class="director-banner">
-        <span v-html="svg('director')"></span>
-        Director Mode — pivot the story
-      </div>
-      <div class="input-area">
-        <button class="director-toggle-btn" :class="{active: directorMode}" @click="directorMode = !directorMode" title="Director Mode">
-          <span v-html="svg('directorGrid')"></span>
-        </button>
-        <input
-          class="chat-input"
-          :class="{director: directorMode}"
-          v-model="inputText"
-          @keyup.enter="sendAdventureMessage"
-          :placeholder="directorMode ? 'Direct the story...' : 'What do you do?'"
-        />
-        <button class="send-btn" @click="sendAdventureMessage" :disabled="isLoading || !inputText.trim()">
-          <span v-html="svg('send')"></span>
-        </button>
-      </div>
-    </div>
-
-    <!-- STORY VIEW -->
-    <div v-else-if="view === 'story'" class="view story-view">
-      <div class="topbar">
-        <button class="icon-btn" @click="goBack()">
-          <span v-html="svg('arrowBack')"></span>
-        </button>
-        <span class="topbar-title">{{ activeSession?.name }}</span>
-        <div class="kebab-menu" ref="kebabMenuRef">
-          <button class="icon-btn" @click="chatMenu = !chatMenu">
-            <span v-html="svg('kebab')"></span>
-          </button>
-          <div v-if="chatMenu" class="kebab-dropdown">
-            <div class="kebab-item" @click="openSummaryModal(); chatMenu = false">
+            <div v-if="view === 'story'" class="kebab-item" @click="openSummaryModal(); chatMenu = false">
               <span v-html="svg('summary')"></span>
               Summary
             </div>
@@ -371,23 +238,132 @@
           </div>
         </div>
       </div>
-      <div class="story-body" ref="storyBody" @scroll="updateChunkNavState">
+
+      <!-- ===== MESSAGES AREA (Chat & Adventure) ===== -->
+      <div v-if="view !== 'story'" class="messages-area" ref="messagesArea">
+        <div v-if="activeMessages.length === 0 && view === 'chat'" class="empty-chat">
+          <span v-html="svg('emptyChat')"></span>
+          <p>Say something!</p>
+        </div>
+        <div v-if="view === 'adventure'" class="scenario-banner">
+          <span v-html="svg('star')"></span>
+          <span>{{ activeSession?.scenario }}</span>
+        </div>
+        <template v-for="msg in activeMessages" :key="msg.id">
+          <!-- Adventure bot messages: split prose into standalone blocks, dialogue into bubbles -->
+          <template v-if="view === 'adventure' && msg.role !== 'user' && !msg.isDirector && !msg.isNarrator">
+            <!-- Image message -->
+            <div v-if="msg.isImage" class="prose-image" :class="{loaded: msg.imageUrl}">
+              <div class="image-prompt-overlay">
+                <div class="image-prompt-text">
+                  <span class="image-label">Generating Image...</span>
+                  {{ msg.imagePrompt }}
+                  <div v-if="!msg.imageUrl" class="image-spinner"></div>
+                </div>
+              </div>
+              <img v-if="msg.imageUrl" :src="msg.imageUrl" alt="Generated scene" />
+              <button v-if="msg.imageUrl" class="image-remove-btn" @click="removeImage(msg.id)" title="Remove image" :disabled="isGeneratingImage">
+                <span v-html="svg('close')"></span>
+              </button>
+              <button v-if="msg.imageUrl" class="image-redo-btn" @click="redoImage(msg.id)" title="Redo (same prompt, new seed)" :disabled="isGeneratingImage">
+                <span v-html="svg('redo')"></span>
+              </button>
+              <button v-if="msg.imageUrl" class="image-reimagine-btn" @click="reimagineImage(msg.id)" title="Reimagine (new prompt)" :disabled="isGeneratingImage">
+                <span v-html="svg('image')"></span>
+              </button>
+            </div>            
+            <!-- During streaming, show raw content in a single bubble -->
+            <div v-if="msg.streaming" class="message-row bot-row">
+              <div class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+                {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
+              </div>
+              <div class="message-wrap">
+                <div class="msg-name">{{ msg.botName }}</div>
+                <div class="message-bubble bot-bubble">
+                  {{ msg.content }}
+                </div>
+              </div>
+            </div>
+            <!-- After streaming, split into segments -->
+            <template v-else v-for="(unit, ui) in getAdventureRenderUnits(msg)" :key="msg.id + '-' + ui">
+              <div v-if="unit.isDialogue" class="message-row bot-row">
+                <div class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+                  {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
+                </div>
+                <div class="message-wrap">
+                  <div class="msg-name">{{ msg.botName }}</div>
+                  <div class="message-bubble bot-bubble">
+                    <span class="prose-quote-mark">"</span>{{ unit.text }}<span class="prose-quote-mark">"</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else :class="'prose-seg prose-' + unit.type + ' adventure-prose-block'">
+                {{ unit.text }}
+              </div>
+            </template>
+          </template>
+          <!-- Default message rendering (chat mode, adventure user/director/narrator) -->
+          <div v-else :class="['message-row', msg.role === 'user' ? 'user-row' : 'bot-row', msg.isDirector ? 'director-row' : '']">
+            <div v-if="msg.role !== 'user' && !msg.isDirector" class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+              {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
+            </div>
+            <div v-if="msg.isDirector" class="msg-avatar director-avatar">
+              <span v-html="svg('director')"></span>
+            </div>
+            <div class="message-wrap">
+              <div v-if="msg.role !== 'user'" class="msg-name">{{ msg.isDirector ? '🎬 Director' : msg.botName }}</div>
+              <div :class="['message-bubble', msg.role === 'user' ? 'user-bubble' : 'bot-bubble', msg.isDirector ? 'director-bubble' : '']">
+                <span v-if="msg.typing" class="typing-dots"><span></span><span></span><span></span></span>
+                <template v-else>
+                  <template v-if="msg.isNarrator || msg.isDirector">
+                    <span>{{ msg.content }}</span>
+                  </template>
+                  <template v-else>
+                    <div v-for="(seg, si) in parseProseSegments(msg.content)" :key="si" :class="'prose-seg prose-' + seg.type">
+                      <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
+                    </div>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- ===== STORY BODY (Story view) ===== -->
+      <div v-if="view === 'story'" class="story-body" ref="storyBody" @scroll="updateChunkNavState">
         <div class="story-scenario-header">
           <h2>{{ activeSession?.name }}</h2>
           <p class="story-premise">{{ activeSession?.scenario }}</p>
         </div>
         <div v-if="storyChunks.length === 0 && !isLoading" class="story-start">
-          <button class="btn-primary" @click="generateStoryChunk(true)">
-            <span v-html="svg('play')"></span>
-            Begin Story
-          </button>
+          <p style="color: var(--text-muted); font-size: 15px;">Press the send button to begin your story</p>
         </div>
-        <div v-for="(chunk, idx) in storyChunks" :key="idx" :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : '']">
-          <div v-if="idx > 0 && chunk.type !== 'director'" :id="'divider-' + idx" class="story-chunk-divider"><span>✦</span></div>
-          <template v-if="chunk.type === 'director'">
+        <div v-for="(chunk, idx) in storyChunks" :key="idx" :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : chunk.type === 'image' ? 'prose-image' : '', chunk.type === 'image' && chunk.imageUrl ? 'loaded' : '']">
+          <template v-if="chunk.type === 'image'">
+            <div class="image-prompt-overlay">
+              <div class="image-prompt-text">
+                <span class="image-label">Generating Image...</span>
+                {{ chunk.prompt }}
+                <div v-if="!chunk.imageUrl" class="image-spinner"></div>
+              </div>
+            </div>
+            <img v-if="chunk.imageUrl" :src="chunk.imageUrl" alt="Generated scene" />
+            <button v-if="chunk.imageUrl" class="image-remove-btn" @click="removeImage(chunk.ts)" title="Remove image" :disabled="isGeneratingImage">
+              <span v-html="svg('close')"></span>
+            </button>
+            <button v-if="chunk.imageUrl" class="image-redo-btn" @click="redoImage(chunk.ts)" title="Redo (same prompt, new seed)" :disabled="isGeneratingImage">
+              <span v-html="svg('redo')"></span>
+            </button>
+            <button v-if="chunk.imageUrl" class="image-reimagine-btn" @click="reimagineImage(chunk.ts)" title="Reimagine (new prompt)" :disabled="isGeneratingImage">
+              <span v-html="svg('image')"></span>
+            </button>
+          </template>          
+          <template v-else-if="chunk.type === 'director'">
             {{ chunk.content }}
           </template>
           <template v-else>
+            <div v-if="idx > 0 && chunk.type !== 'director' && chunk.type !== 'image'" :id="'divider-' + idx" class="story-chunk-divider"><span>✦</span></div>
             <div v-for="(seg, si) in parseProseSegments(chunk)" :key="si" class="prose-seg-wrapper" :class="{ tapped: isTouchDevice && tappedSegKey === idx + '-' + si }" @click="handleSegTap(idx + '-' + si)">
               <div v-if="editingSegKey !== idx + '-' + si" :class="'prose-seg prose-' + seg.type + ' story-prose-seg'">
                 <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
@@ -396,16 +372,11 @@
                 </button>
               </div>
               <div v-else class="prose-edit-inline">
-                <div class="settings-label">Edit text and tags:</div>
+                <div class="settings-label">Edit text:</div>
                 <textarea class="prose-edit-textarea" v-model="editSegText" rows="5"></textarea>
-                <div class="prose-tag-btns">
-                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓝ', $event)">Ⓝ</button>
-                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓐ', $event)">Ⓐ</button>
-                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓣ', $event)">Ⓣ</button>
-                  <button class="prose-tag-btn" @mousedown.prevent="insertProseTag('Ⓓ', $event)">Ⓓ</button>
-                </div>
                 <div class="prose-edit-actions">
                   <button class="btn-secondary" @click="cancelEdit()">Cancel</button>
+                  <button class="btn-danger" @click="deleteSegmentEdit(idx, si)">Delete</button>
                   <button class="btn-primary" @click="saveSegmentEdit(idx, si, seg)">Save Changes</button>
                 </div>
               </div>
@@ -416,15 +387,9 @@
           <span class="typing-dots"><span></span><span></span><span></span></span>
           Generating...
         </div>
-        <div v-if="storyChunks.length > 0 && !isLoading" class="story-more-wrap">
-          <button class="btn-more" @click="generateStoryChunk(false)">
-            <span v-html="svg('continue')"></span>
-            Continue Story
-          </button>
-        </div>
       </div>
 
-      <!-- Chunk Navigation -->
+      <!-- Chunk Navigation (Story only) -->
       <div v-if="view === 'story' && storyChunks.filter(c => c.type !== 'director').length > 1" class="story-chunk-nav">
         <button v-if="canNavUp" class="chunk-nav-btn" @click="scrollToChunkDivider('up')" title="Previous chapter">
           <span v-html="svg('chunkUp')"></span>
@@ -434,24 +399,47 @@
         </button>
       </div>
 
-      <!-- FAB for Director Mode -->
-      <button v-if="!storyDirectorInput" class="story-fab" @click="storyDirectorInput = true" title="Direct the story">
-        <span v-html="svg('directorGrid')"></span>
-      </button>
+      <!-- @mention suggestions (Chat only) -->
+      <div v-if="view === 'chat' && mentionSuggestions.length" class="mention-popup">
+        <div v-for="bot in mentionSuggestions" :key="bot.id" class="mention-item" @click="selectMention(bot)">
+          <div class="mention-avatar" :style="{background: bot.color}">{{ bot.name[0].toUpperCase() }}</div>
+          {{ bot.name }}
+        </div>
+      </div>
 
-      <!-- Director Input Bar -->
-      <div v-if="storyDirectorInput" class="story-director-input">
-        <button class="icon-btn" @click="storyDirectorInput = false; inputText = ''">
-          <span v-html="svg('close')"></span>
+      <!-- ===== UNIFIED INPUT BAR ===== -->
+      <div v-if="view === 'adventure' && directorMode" class="director-banner">
+        <span v-html="svg('director')"></span>
+        Director Mode — pivot the story
+      </div>
+      <div v-if="view === 'story' && directorMode" class="director-banner">
+        <span v-html="svg('director')"></span>
+        Director Mode — reshape the story
+      </div>
+      <div class="input-area">
+        <!-- @ mention button: Chat only -->
+        <button v-if="view === 'chat'" class="at-btn" @click="insertAt" title="Mention a bot">@</button>
+        <!-- Director toggle: Adventure & Story only -->
+        <button v-if="view === 'adventure' || view === 'story'" class="director-toggle-btn" :class="{active: directorMode}" @click="directorMode = !directorMode" title="Director Mode">
+          <span v-html="svg('directorGrid')"></span>
         </button>
-        <input
-          type="text"
-          class="chat-input"
-          v-model="inputText"
-          @keydown.enter="sendStoryDirectorInput"
-          placeholder="Direct the story..."
-        />
-        <button class="send-btn" @click="sendStoryDirectorInput" :disabled="isLoading || !inputText.trim()">
+        <!-- Image generate button: Adventure & Story only -->
+        <button v-if="view === 'adventure' || view === 'story'" class="image-btn" @click="handleImageGenerate" :disabled="isGeneratingImage || isLoading" title="Generate Scene Image">
+          <span v-html="svg('image')"></span>
+        </button>
+        <div class="chat-input-wrap">
+          <input
+            class="chat-input"
+            :class="{director: directorMode}"
+            v-model="inputText"
+            @input="view === 'chat' ? onInput() : null"
+            @keyup.enter="handleSend"
+            :placeholder="inputPlaceholder"
+            :disabled="inputDisabled"
+            ref="chatInput"
+          />
+        </div>
+        <button class="send-btn" @click="handleSend" :disabled="isLoading || (!inputDisabled && !inputText.trim())">
           <span v-html="svg('send')"></span>
         </button>
       </div>
@@ -535,6 +523,19 @@
           </div>
         </div>
         <button class="btn-primary full-width" @click="summaryModalOpen = false">Close</button>
+      </div>
+    </div>
+
+    <!-- Prose Edit Modal -->
+    <div v-if="modal === 'editProse'" class="modal-overlay" @click.self="modal=null">
+      <div class="modal">
+        <div class="modal-title">Edit Prose Segment</div>
+        <textarea class="prose-edit-textarea" v-model="editSegText" rows="6"></textarea>
+        <div class="prose-edit-actions">
+          <button class="btn-secondary" @click="cancelEdit(); modal=null">Cancel</button>
+          <button class="btn-danger" @click="deleteSegmentEditFromModal()">Delete</button>
+          <button class="btn-primary" @click="saveSegmentEditFromModal()">Save Changes</button>
+        </div>
       </div>
     </div>
 

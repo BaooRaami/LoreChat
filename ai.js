@@ -189,7 +189,42 @@ async function callAI(messages, systemPrompt, apiKey, model, onChunk = null) {
   }
 
   return fullText.trim();
-}// ============================================================
+}
+
+// ============================================================
+// IMAGE PROMPT GENERATOR
+// ============================================================
+
+function buildImagePromptSystem(bots, scenario, summary) {
+  const botList = bots.map(b => `- ${b.name}: ${b.persona}`).join('\n');
+  const summaryBlock = summary ? `\nStory summary so far:\n${summary}` : '';
+
+  return `You are an expert visual prompt engineer for AI image generation.
+You create vivid, detailed image prompts (~200 words) for Pollinations AI image generator.
+
+Scenario: ${scenario}
+
+Characters:
+${botList}
+${summaryBlock}
+
+RULES:
+- Write ONE cohesive image prompt of roughly 200 words.
+- Describe the scene visually: lighting, colors, mood, atmosphere, camera angle, art style.
+- Include the characters with their distinctive looks based on their personas.
+- The prompt should feel cinematic and immersive.
+- Do NOT use markdown, headers, or bullet points.
+- Output ONLY the image prompt text — nothing else.
+- Do NOT mention you are an AI. Just output the prompt.`;
+}
+
+async function generateImagePrompt(bots, scenario, summary, settings) {
+  const systemPrompt = buildImagePromptSystem(bots, scenario, summary);
+  const messages = [{ role: 'user', content: 'Generate an image prompt for the current scene.' }];
+  return await callAI(messages, systemPrompt, settings.apiKey, settings.model);
+}
+
+// ============================================================
 // MODE HANDLERS
 // ============================================================
 
@@ -302,4 +337,4 @@ RULES:
 
   return await callAI(messages, systemPrompt, settings.apiKey, settings.model);
 }
-const AI = { sendSimpleChat, sendAdventureMessage, generateStoryChunk, generateStorySummary };
+const AI = { sendSimpleChat, sendAdventureMessage, generateStoryChunk, generateStorySummary, generateImagePrompt };

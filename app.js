@@ -21,9 +21,9 @@ createApp({
     const settingsSaved = ref(false);
     const errorMsg = ref('');
     const isLoading = ref(false);
+    const isGeneratingImage = ref(false);
     const directorMode = ref(false);
     const chatMenu = ref(false);
-    const storyDirectorInput = ref(false);
     const summaryModalOpen = ref(false);
     const canNavUp = ref(false);
     const canNavDown = ref(false);
@@ -63,7 +63,6 @@ createApp({
     const kebabMenuRef = ref(null);
 
     // ===== ICON HELPER =====
-    // Returns SVG string by name from the centralized icons.js library
     function svg(name, className = '') {
       return getIcon(name, className);
     }
@@ -88,6 +87,29 @@ createApp({
       return 'Delete Chat';
     });
 
+    // Unified input placeholder
+    const inputPlaceholder = computed(() => {
+      if (view.value === 'chat') return 'Message...';
+      if (view.value === 'adventure') {
+        return directorMode.value ? 'Direct the story...' : 'What do you do?';
+      }
+      if (view.value === 'story') {
+        if (storyChunks.value.length === 0) return 'Begin Story →';
+        if (directorMode.value) return 'Direct the story...';
+        return 'Continue Story →';
+      }
+      return '';
+    });
+
+    // Unified input disabled state
+    const inputDisabled = computed(() => {
+      if (view.value === 'story') {
+        // In story mode, input is disabled unless director mode is on
+        return !directorMode.value;
+      }
+      return false;
+    });
+
     function kebabDelete() {
       if (view.value === 'chat') { deleteChat(activeSession.value.id); goBack(); }
       else if (view.value === 'adventure') { deleteAdventure(activeSession.value.id); goBack(); }
@@ -96,71 +118,50 @@ createApp({
 
     // ===== PROSE PARSER =====
     function parseProseSegments(text) {
-      // Handle objects with content property (streaming/director chunks)
       if (typeof text === 'object' && text !== null) {
-        if (text.content) {
-          text = text.content;
-        } else {
-          return [{ type: 'plain', text: '', raw: '' }];
-        }
+        if (text.content) { text = text.content; }
+        else { return [{ type: 'plain', text: '', raw: '' }]; }
       }
-
       if (!text || typeof text !== 'string') return [];
-
-      // PREPROCESSING: Fix spacing issues around tags
-      text = text.replace(/([a-zA-Z])(NN|AA|TT|DD)/g, '$1 $2'); // Add space before tag if stuck to word
-      text = text.replace(/(NN|AA|TT|DD)([a-zA-Z])/g, '$1 $2'); // Add space after tag if stuck to word
-
-      const tagMap = {
-        'NN': 'narrate',
-        'AA': 'action',
-        'TT': 'thought',
-        'DD': 'dialogue'
-      };
-
+      text = text.replace(/([a-zA-Z])(NN|AA|TT|DD)/g, '$1 $2');
+      text = text.replace(/(NN|AA|TT|DD)([a-zA-Z])/g, '$1 $2');
+      const tagMap = { 'NN': 'narrate', 'AA': 'action', 'TT': 'thought', 'DD': 'dialogue' };
       const segments = [];
-
-      // Find all tag positions in the text
       const tagPattern = /\b(NN|AA|TT|DD)\s/g;
       const matches = [];
       let match;
-
       while ((match = tagPattern.exec(text)) !== null) {
-        matches.push({
-          tag: match[1],
-          index: match.index
-        });
+        matches.push({ tag: match[1], index: match.index });
       }
-
-      // If no tags found, return as plain text
       if (matches.length === 0) {
         return [{ type: 'plain', text: text.trim(), raw: text.trim() }];
       }
-
-      // Extract content between tags
       for (let i = 0; i < matches.length; i++) {
         const current = matches[i];
         const next = matches[i + 1];
-
-        // Get content from current tag to next tag (or end of text)
-        const startPos = current.index + current.tag.length + 1; // +1 for the space
+        const startPos = current.index + current.tag.length + 1;
         const endPos = next ? next.index : text.length;
         let content = text.substring(startPos, endPos).trim();
-
-        // Strip opening/closing quotation marks from content
         content = content.replace(/^["'""]|["'""]$/g, '');
-
         if (content) {
           const rawText = text.substring(current.index, endPos).trim();
-          segments.push({
-            type: tagMap[current.tag],
-            text: content,
-            raw: rawText
-          });
+          segments.push({ type: tagMap[current.tag], text: content, raw: rawText });
         }
       }
       return segments.length > 0 ? segments : [{ type: 'plain', text, raw: text }];
     }
+
+    function getAdventureRenderUnits(msg) {
+      const segments = parseProseSegments(msg.content);
+      return segments
+        .filter(seg => seg.text.trim())
+        .map(seg => ({
+          type: seg.type === 'plain' ? 'narrate' : seg.type,
+          text: seg.text,
+          isDialogue: seg.type === 'dialogue'
+        }));
+    }
+
     // ===== HELPERS =====
     function getBotColor(botId) {
       const bot = bots.value.find(b => b.id === botId);
@@ -175,6 +176,12 @@ createApp({
     function getBotEmoji(botId) {
       const bot = bots.value.find(b => b.id === botId);
       return bot ? bot.emoji || '' : '';
+    }
+
+    function getImageUrl(prompt) {
+      const encoded = encodeURIComponent(prompt);
+      const key = settings.value.apiKey ? `&key=${settings.value.apiKey}` : '';
+      return `https://gen.pollinations.ai/image/${encoded}?model=zimage&width=768&height=1152&private=true${key}`;
     }
 
     function formatTime(ts) {
@@ -237,6 +244,7 @@ createApp({
       }
       setTimeout(updateChunkNavState, 400);
     }
+
     // ===== NAVIGATION =====
     function navigate(target) {
       viewHistory.value.push(view.value);
@@ -250,6 +258,9 @@ createApp({
       storyChunks.value = [];
       inputText.value = '';
       directorMode.value = false;
+      editingSegKey.value = null;
+      editSegText.value = '';
+      tappedSegKey.value = null;
     }
 
     // ===== SETTINGS =====
@@ -327,7 +338,6 @@ createApp({
       const ns = newSession.value;
       if (ns.botIds.length === 0) return;
 
-      // Auto-generate name for Chat mode if empty
       let sessionName = ns.name.trim();
       if (homeTab.value === 'chats' && !sessionName) {
         const selectedBots = bots.value.filter(b => ns.botIds.includes(b.id));
@@ -338,7 +348,6 @@ createApp({
         }
       }
 
-      // For Adventure and Story modes, name is still required
       if ((homeTab.value === 'adventure' || homeTab.value === 'stories') && !sessionName) return;
 
       const id = DB.generateId();
@@ -365,10 +374,12 @@ createApp({
         openStory(session);
       }
     }
+
     // ===== CHAT =====
     function openChat(chat) {
       activeSession.value = chat;
       activeMessages.value = chat.messages || [];
+      directorMode.value = false;
       navigate('chat');
       scrollToBottom(messagesArea);
     }
@@ -380,12 +391,14 @@ createApp({
       activeSession.value.messages = [];
       activeSession.value.chunks = [];
       activeSession.value.lastMessage = '';
+      if (view.value === 'story') activeSession.value.summary = '';
       activeSession.value.updatedAt = Date.now();
       if (view.value === 'chat') await DB.putOne('chats', toPlain(activeSession.value));
       if (view.value === 'adventure') await DB.putOne('adventures', toPlain(activeSession.value));
       if (view.value === 'story') await DB.putOne('stories', toPlain(activeSession.value));
       await loadAll();
     }
+
     // @mention detection
     function onInput() {
       const val = inputText.value;
@@ -413,6 +426,219 @@ createApp({
       mentionedBot.value = bot;
       mentionSuggestions.value = [];
       chatInput.value?.focus();
+    }
+
+    // ===== UNIFIED SEND HANDLER =====
+    async function redoImage(imageId) {
+      if (isGeneratingImage.value) return;
+      isGeneratingImage.value = true;
+
+      try {
+        let imageEntry, prompt;
+        
+        if (view.value === 'adventure') {
+          const idx = activeMessages.value.findIndex(m => m.id === imageId);
+          if (idx < 0) return;
+          imageEntry = activeMessages.value[idx];
+          prompt = imageEntry.imagePrompt;
+          activeMessages.value[idx] = { ...activeMessages.value[idx], imageUrl: null };
+        } else if (view.value === 'story') {
+          const idx = storyChunks.value.findIndex(c => c.ts === imageId && c.type === 'image');
+          if (idx < 0) return;
+          imageEntry = storyChunks.value[idx];
+          prompt = imageEntry.prompt;
+          storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl: null };
+        }
+
+        const imageUrl = getImageUrl(prompt + '&seed=' + Date.now());
+
+        const img = new Image();
+        img.onload = async () => {
+          if (view.value === 'adventure') {
+            const idx = activeMessages.value.findIndex(m => m.id === imageId);
+            if (idx >= 0) {
+              activeMessages.value[idx] = { ...activeMessages.value[idx], imageUrl };
+            }
+            activeSession.value.messages = [...activeMessages.value];
+            await DB.putOne('adventures', toPlain(activeSession.value));
+          } else if (view.value === 'story') {
+            const idx = storyChunks.value.findIndex(c => c.ts === imageId && c.type === 'image');
+            if (idx >= 0) {
+              storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl };
+            }
+            activeSession.value.chunks = [...storyChunks.value];
+            await DB.putOne('stories', toPlain(activeSession.value));
+          }
+          await loadAll();
+        };
+        img.src = imageUrl;
+      } catch (err) {
+        showError('Image regeneration error: ' + err.message);
+      }
+      isGeneratingImage.value = false;
+    }
+
+    async function reimagineImage(imageId) {
+      if (isGeneratingImage.value) return;
+      isGeneratingImage.value = true;
+
+      try {
+        let imageIdx;
+        
+        if (view.value === 'adventure') {
+          imageIdx = activeMessages.value.findIndex(m => m.id === imageId);
+          if (imageIdx < 0) return;
+          activeMessages.value[imageIdx] = { ...activeMessages.value[imageIdx], imageUrl: null };
+        } else if (view.value === 'story') {
+          imageIdx = storyChunks.value.findIndex(c => c.ts === imageId && c.type === 'image');
+          if (imageIdx < 0) return;
+          storyChunks.value[imageIdx] = { ...storyChunks.value[imageIdx], imageUrl: null };
+        }
+
+        const newPrompt = await AI.generateImagePrompt(
+          activeBots.value,
+          activeSession.value.scenario,
+          activeSession.value.summary || null,
+          settings.value
+        );
+
+        if (view.value === 'adventure') {
+          activeMessages.value[imageIdx] = { ...activeMessages.value[imageIdx], imagePrompt: newPrompt };
+        } else if (view.value === 'story') {
+          storyChunks.value[imageIdx] = { ...storyChunks.value[imageIdx], prompt: newPrompt };
+        }
+
+        const imageUrl = getImageUrl(newPrompt);
+
+        const img = new Image();
+        img.onload = async () => {
+          if (view.value === 'adventure') {
+            const idx = activeMessages.value.findIndex(m => m.id === imageId);
+            if (idx >= 0) {
+              activeMessages.value[idx] = { ...activeMessages.value[idx], imageUrl };
+            }
+            activeSession.value.messages = [...activeMessages.value];
+            await DB.putOne('adventures', toPlain(activeSession.value));
+          } else if (view.value === 'story') {
+            const idx = storyChunks.value.findIndex(c => c.ts === imageId && c.type === 'image');
+            if (idx >= 0) {
+              storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl };
+            }
+            activeSession.value.chunks = [...storyChunks.value];
+            await DB.putOne('stories', toPlain(activeSession.value));
+          }
+          await loadAll();
+        };
+        img.src = imageUrl;
+      } catch (err) {
+        showError('Image reimagine error: ' + err.message);
+      }
+      isGeneratingImage.value = false;
+    }
+
+    async function removeImage(imageId) {
+      if (view.value === 'adventure') {
+        const idx = activeMessages.value.findIndex(m => m.id === imageId);
+        if (idx >= 0) {
+          activeMessages.value.splice(idx, 1);
+          activeSession.value.messages = [...activeMessages.value];
+          await DB.putOne('adventures', toPlain(activeSession.value));
+          await loadAll();
+        }
+      } else if (view.value === 'story') {
+        const idx = storyChunks.value.findIndex(c => c.ts === imageId && c.type === 'image');
+        if (idx >= 0) {
+          storyChunks.value.splice(idx, 1);
+          activeSession.value.chunks = [...storyChunks.value];
+          await DB.putOne('stories', toPlain(activeSession.value));
+          await loadAll();
+        }
+      }
+    }
+
+    async function handleImageGenerate() {      
+      if (isGeneratingImage.value || isLoading.value) return;
+      isGeneratingImage.value = true;
+
+      try {
+        const prompt = await AI.generateImagePrompt(
+          activeBots.value,
+          activeSession.value.scenario,
+          activeSession.value.summary || null,
+          settings.value
+        );
+
+        const imageEntry = {
+          id: DB.generateId(),
+          type: 'image',
+          prompt: prompt,
+          imageUrl: null,
+          ts: Date.now()
+        };
+
+        if (view.value === 'adventure') {
+          activeMessages.value.push({
+            id: imageEntry.id,
+            role: 'bot',
+            botId: null,
+            botName: 'Image',
+            content: '',
+            isImage: true,
+            imagePrompt: prompt,
+            imageUrl: null,
+            ts: imageEntry.ts
+          });
+          activeSession.value.messages = [...activeMessages.value];
+          activeSession.value.updatedAt = Date.now();
+          await DB.putOne('adventures', toPlain(activeSession.value));
+        } else if (view.value === 'story') {
+          storyChunks.value.push({ type: 'image', prompt: prompt, imageUrl: null, ts: imageEntry.ts });
+          activeSession.value.chunks = [...storyChunks.value];
+          activeSession.value.updatedAt = Date.now();
+          await DB.putOne('stories', toPlain(activeSession.value));
+        }
+
+        await loadAll();
+        if (view.value === 'adventure') scrollToBottom(messagesArea);
+        else scrollToBottom(storyBody);
+
+        const imageUrl = getImageUrl(prompt);
+
+        // Wait for the image to actually load before showing it
+        const img = new Image();
+        img.onload = async () => {
+          if (view.value === 'adventure') {
+            const idx = activeMessages.value.findIndex(m => m.id === imageEntry.id);
+            if (idx >= 0) {
+              activeMessages.value[idx] = { ...activeMessages.value[idx], imageUrl };
+            }
+            activeSession.value.messages = [...activeMessages.value];
+            await DB.putOne('adventures', toPlain(activeSession.value));
+          } else if (view.value === 'story') {
+            const idx = storyChunks.value.findIndex(c => c.ts === imageEntry.ts && c.type === 'image');
+            if (idx >= 0) {
+              storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl };
+            }
+            activeSession.value.chunks = [...storyChunks.value];
+            await DB.putOne('stories', toPlain(activeSession.value));
+          }
+          await loadAll();
+        };
+        img.src = imageUrl;
+      } catch (err) {
+        showError('Image generation error: ' + err.message);
+      }
+      isGeneratingImage.value = false;
+    }
+
+    async function handleSend() {
+      if (view.value === 'chat') {
+        await sendMessage();
+      } else if (view.value === 'adventure') {
+        await sendAdventureMessage();
+      } else if (view.value === 'story') {
+        await sendStoryMessage();
+      }
     }
 
     async function sendMessage() {
@@ -483,6 +709,7 @@ createApp({
     function openAdventure(adv) {
       activeSession.value = adv;
       activeMessages.value = adv.messages || [];
+      directorMode.value = false;
       navigate('adventure');
       scrollToBottom(messagesArea);
     }
@@ -555,7 +782,40 @@ createApp({
       activeSession.value = story;
       storyChunks.value = (story.chunks || []).filter(c => c !== null && c !== undefined);
       if (story.summary) activeSession.value.summary = story.summary;
+      directorMode.value = false;
       navigate('story');
+    }
+
+    async function sendStoryMessage() {
+      const text = inputText.value.trim();
+      if (isLoading.value) return;
+
+      const isFirst = storyChunks.value.length === 0;
+      const isDirector = directorMode.value;
+
+      // Director mode always requires text
+      if (isDirector && !text) return;
+
+      // Continue story — just press send, no text needed
+      if (!isFirst && !isDirector) {
+        inputText.value = '';
+        await generateStoryChunk(false, null);
+        return;
+      }
+
+      if (isDirector) {
+        const directorChunk = { type: 'director', content: text };
+        storyChunks.value.push(directorChunk);
+        inputText.value = '';
+        directorMode.value = false;
+        scrollToBottom(storyBody);
+        await generateStoryChunk(false, text);
+        return;
+      }
+
+      // Begin story — press send with empty input to start
+      inputText.value = '';
+      await generateStoryChunk(true, null);
     }
 
     async function generateStoryChunk(isFirst, directorInput = null) {
@@ -586,7 +846,7 @@ createApp({
         await loadAll();
         scrollToBottom(storyBody);
 
-        // Generate summary in background — do not await, user keeps reading
+        // Generate summary in background
         AI.generateStorySummary(
           storyChunks.value.filter(c => typeof c === 'string'),
           activeBots.value,
@@ -595,7 +855,7 @@ createApp({
         ).then(async (summary) => {
           activeSession.value.summary = summary;
           await DB.putOne('stories', toPlain(activeSession.value));
-        }).catch(() => { /* summary failure is non-critical, silently ignore */ });
+        }).catch(() => { /* silently ignore */ });
 
       } catch (err) {
         storyChunks.value.splice(streamingChunkIndex, 1);
@@ -603,24 +863,61 @@ createApp({
       }
       isLoading.value = false;
     }
+
     // ===== STORY SEGMENT EDIT =====
     function startEditSegment(chunkIdx, segIdx, seg) {
       editingSegKey.value = `${chunkIdx}-${segIdx}`;
-      tappedSegKey.value = seg; // Store the segment object
-      editSegText.value = seg.raw; // Load the raw text including [Ⓝ]...[/Ⓝ]
+      tappedSegKey.value = seg;
+      editSegText.value = seg.raw;
       modal.value = 'editProse';
     }
 
-    function insertProseTag(symbol, event) {
-      const ta = event.target.closest('.prose-edit-inline').querySelector('.prose-edit-textarea');
-      const val = ta.value;
-      const cursor = ta.selectionStart;
-      const newVal = val.slice(0, cursor) + symbol + val.slice(cursor);
-      editSegText.value = newVal;
-      nextTick(() => {
-        ta.focus();
-        ta.setSelectionRange(cursor + symbol.length, cursor + symbol.length);
-      });
+    function saveSegmentEditFromModal() {
+      // Parse the key to get chunk and segment indices
+      if (!editingSegKey.value) return;
+      const [chunkIdx, segIdx] = editingSegKey.value.split('-').map(Number);
+      const oldSeg = tappedSegKey.value;
+      if (!oldSeg) return;
+
+      const newRaw = editSegText.value.trim();
+      const chunk = storyChunks.value[chunkIdx];
+
+      if (typeof chunk === 'string') {
+        storyChunks.value[chunkIdx] = chunk.replace(oldSeg.raw, newRaw);
+      }
+
+      cancelEdit();
+      modal.value = null;
+      activeSession.value.chunks = [...storyChunks.value];
+      activeSession.value.updatedAt = Date.now();
+      DB.putOne('stories', toPlain(activeSession.value));
+    }
+
+    async function deleteSegmentEdit(chunkIdx, segIdx) {
+      const chunk = storyChunks.value[chunkIdx];
+      if (typeof chunk === 'string') {
+        const segs = parseProseSegments(chunk);
+        const segToDelete = segs[segIdx];
+        if (segToDelete && segToDelete.raw) {
+          let newChunk = chunk.replace(segToDelete.raw, '').replace(/\s+/g, ' ').trim();
+          if (!newChunk) {
+            storyChunks.value.splice(chunkIdx, 1);
+          } else {
+            storyChunks.value[chunkIdx] = newChunk;
+          }
+        }
+      }
+      cancelEdit();
+      activeSession.value.chunks = [...storyChunks.value];
+      activeSession.value.updatedAt = Date.now();
+      await DB.putOne('stories', toPlain(activeSession.value));
+    }
+
+    function deleteSegmentEditFromModal() {
+      if (!editingSegKey.value) return;
+      const [chunkIdx, segIdx] = editingSegKey.value.split('-').map(Number);
+      deleteSegmentEdit(chunkIdx, segIdx);
+      modal.value = null;
     }
 
     function cancelEdit() {
@@ -640,7 +937,6 @@ createApp({
       const chunk = storyChunks.value[chunkIdx];
 
       if (typeof chunk === 'string') {
-        // This replaces the old text (including any broken tags) with your fix
         storyChunks.value[chunkIdx] = chunk.replace(oldSeg.raw, newRaw);
       }
 
@@ -669,21 +965,6 @@ createApp({
       await loadAll();
     }
 
-    async function sendStoryDirectorInput() {
-      const text = inputText.value.trim();
-      if (!text || isLoading.value) return;
-
-      // Add director message as a special chunk
-      const directorChunk = { type: 'director', content: text };
-      storyChunks.value.push(directorChunk);
-
-      inputText.value = '';
-      storyDirectorInput.value = false;
-      scrollToBottom(storyBody);
-
-      // Generate next chunk based on director input
-      await generateStoryChunk(false, text);
-    }
     // ===== IMPORT / EXPORT =====
     function downloadJSON(data, filename) {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -720,10 +1001,7 @@ createApp({
     // ===== INIT =====
     onMounted(async () => {
       isTouchDevice.value = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-
-      // Inject CSS custom properties for background-image icons (prose watermarks)
       injectIconStyles();
-
       await loadAll();
       watch(storyChunks, () => { setTimeout(updateChunkNavState, 300); }, { deep: true });
       document.addEventListener('click', (e) => {
@@ -745,24 +1023,30 @@ createApp({
       messagesArea, storyBody, chatInput, importFile, kebabMenuRef,
       botColors: BOT_COLORS,
       botEmojis: BOT_EMOJIS,
-      getBotColor, getBotInitial, getBotEmoji, formatTime, parseProseSegments,
+      getAdventureRenderUnits, getBotColor, getBotInitial, getBotEmoji, formatTime, parseProseSegments,
       kebabClearLabel, kebabDeleteLabel, kebabDelete,
+      inputPlaceholder, inputDisabled,
       navigate, goBack,
       saveSettings,
       openBotModal, editBot, saveBot, deleteBot, deleteBotFromModal, exportBots,
       openCreateModal, toggleBotSelection, createSession,
       openChat, clearSession, onInput, insertAt, selectMention, sendMessage,
       openAdventure, sendAdventureMessage,
-      openStory, generateStoryChunk, sendStoryDirectorInput, storyDirectorInput,
+      openStory, generateStoryChunk, sendStoryMessage,
       canNavUp, canNavDown, scrollToChunkDivider, updateChunkNavState,
       editingSegKey, editSegText, editSegType,
       isTouchDevice, tappedSegKey,
-      startEditSegment, cancelEdit, saveSegmentEdit, handleSegTap, insertProseTag,
+      startEditSegment, cancelEdit, saveSegmentEdit, saveSegmentEditFromModal, deleteSegmentEdit, deleteSegmentEditFromModal, handleSegTap,
       deleteChat, deleteAdventure, deleteStory,
       exportAll, triggerImport, importAll,
       summaryModalOpen, openSummaryModal,
-      // Icon helper exposed to template
-      svg
-    };
+      handleSend,
+      handleImageGenerate,
+      redoImage,
+      reimagineImage,
+      removeImage,
+      isGeneratingImage,
+      getImageUrl,
+      svg    };
   }
 }).mount('#app');
