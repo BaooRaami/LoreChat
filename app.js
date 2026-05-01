@@ -631,8 +631,13 @@ createApp({
       isGeneratingImage.value = false;
     }
 
+    function toggleDirector() {
+      directorMode.value = !directorMode.value;
+      nextTick(() => chatInput.value?.focus());
+    }
+
     async function handleSend() {
-      if (view.value === 'chat') {
+      if (view.value === 'chat') {        
         await sendMessage();
       } else if (view.value === 'adventure') {
         await sendAdventureMessage();
@@ -721,8 +726,8 @@ createApp({
       const userMsg = { id: DB.generateId(), role: 'user', content: text, isDirector: directorMode.value, ts: Date.now() };
       activeMessages.value.push(userMsg);
       inputText.value = '';
+      directorMode.value = false;
       scrollToBottom(messagesArea);
-
       const botMsgId = DB.generateId();
       const botMsg = { id: botMsgId, role: 'bot', botId: null, botName: '...', content: '', streaming: true, ts: Date.now() };
       activeMessages.value.push(botMsg);
@@ -1040,13 +1045,8 @@ createApp({
       deleteChat, deleteAdventure, deleteStory,
       exportAll, triggerImport, importAll,
       summaryModalOpen, openSummaryModal,
-      handleSend,
-      handleImageGenerate,
-      redoImage,
-      reimagineImage,
-      removeImage,
-      isGeneratingImage,
-      getImageUrl,
-      svg    };
+      handleSend, handleImageGenerate, redoImage, reimagineImage, removeImage, isGeneratingImage, getImageUrl,
+      toggleDirector, svg
+    };
   }
 }).mount('#app');

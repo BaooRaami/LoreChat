@@ -420,15 +420,14 @@
         <!-- @ mention button: Chat only -->
         <button v-if="view === 'chat'" class="at-btn" @click="insertAt" title="Mention a bot">@</button>
         <!-- Director toggle: Adventure & Story only -->
-        <button v-if="view === 'adventure' || view === 'story'" class="director-toggle-btn" :class="{active: directorMode}" @click="directorMode = !directorMode" title="Director Mode">
+        <button v-if="view === 'adventure' || view === 'story'" class="director-toggle-btn" :class="{active: directorMode}" @click="toggleDirector" title="Director Mode">          
           <span v-html="svg('directorGrid')"></span>
         </button>
-        <!-- Image generate button: Adventure & Story only -->
-        <button v-if="view === 'adventure' || view === 'story'" class="image-btn" @click="handleImageGenerate" :disabled="isGeneratingImage || isLoading" title="Generate Scene Image">
-          <span v-html="svg('image')"></span>
-        </button>
         <div class="chat-input-wrap">
-          <input
+          <button v-if="view === 'adventure' || view === 'story'" class="image-btn-inline" @click="handleImageGenerate" :disabled="isGeneratingImage || isLoading" title="Generate Scene Image">
+            <span v-html="svg('image')"></span>
+          </button>
+          <input            
             class="chat-input"
             :class="{director: directorMode}"
             v-model="inputText"
