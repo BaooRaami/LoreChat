@@ -183,7 +183,7 @@ select.text-input { cursor: pointer; }
 .input-area { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg-secondary); border-top: 1px solid var(--border); flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
 .chat-input-wrap { flex: 1; display: flex; align-items: center; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-full); padding: 0 6px 0 10px; transition: border-color .2s; }
 .chat-input-wrap:focus-within { border-color: var(--accent); }
-.chat-input { flex: 1; background: transparent; border: none; color: var(--text-primary); padding: 10px 8px; border-radius: var(--radius-full); font-size: 15px; font-family: var(--font); outline: none; }
+.chat-input { flex: 1; background: transparent; border: none; color: var(--text-primary); padding: 10px 8px 10px 4px; border-radius: var(--radius-full); font-size: 15px; font-family: var(--font); outline: none; }
 .chat-input::placeholder { color: var(--text-muted); }
 .chat-input.director { border-color: var(--director-color); background: var(--director-color)11; }
 .chat-input:disabled { opacity: 0.5; cursor: not-allowed; color: var(--text-muted); }
@@ -510,3 +510,10 @@ select.text-input { cursor: pointer; }
 .image-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .image-btn:disabled:hover { background: var(--bg-tertiary); }
 .image-btn:disabled:hover svg { fill: var(--text-secondary); }
+.image-btn-inline { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+.image-btn-inline svg { width: 18px; height: 18px; fill: var(--text-muted); }
+.image-btn-inline:hover { background: var(--accent)22; }
+.image-btn-inline:hover svg { fill: var(--accent); }
+.image-btn-inline:disabled { opacity: 0.4; cursor: not-allowed; }
+.image-btn-inline:disabled:hover { background: transparent; }
+.image-btn-inline:disabled:hover svg { fill: var(--text-muted); }
