@@ -407,7 +407,7 @@ select.text-input { cursor: pointer; }
   overflow: hidden;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  min-height: 660px;
+  min-height: 200px;
 }
 .prose-image.loaded { border-color: transparent; }
 .prose-image img {
