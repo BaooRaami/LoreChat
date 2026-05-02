@@ -334,6 +334,15 @@
                 <template v-else>
                   <template v-if="msg.isNarrator || msg.isDirector">
                     <span>{{ msg.content }}</span>
+                    <button v-if="msg.isDirector" class="prose-edit-btn user-msg-edit-btn" @click.stop="startEditUserMessage(msg.id)" title="Edit">
+                      <span v-html="svg('edit')"></span>
+                    </button>
+                  </template>
+                  <template v-else-if="msg.role === 'user'">
+                    <span>{{ msg.content }}</span>
+                    <button class="prose-edit-btn user-msg-edit-btn" @click.stop="startEditUserMessage(msg.id)" title="Edit">
+                      <span v-html="svg('edit')"></span>
+                    </button>
                   </template>
                   <template v-else>
                     <div v-for="(seg, si) in parseProseSegments(msg.content)" :key="si" :class="'prose-seg prose-' + seg.type">
@@ -381,7 +390,10 @@
             </button>
           </template>          
           <template v-else-if="chunk.type === 'director'">
-            {{ chunk.content }}
+            <div class="story-director-content">{{ chunk.content }}</div>
+            <button class="prose-edit-btn director-chunk-edit-btn" @click.stop="startEditDirectorChunk(idx)" title="Edit">
+              <span v-html="svg('edit')"></span>
+            </button>
           </template>
           <template v-else>
             <div v-if="idx > 0 && chunk.type !== 'director' && chunk.type !== 'image'" :id="'divider-' + idx" class="story-chunk-divider"><span>✦</span></div>
@@ -438,17 +450,14 @@
         Director Mode — reshape the story
       </div>
       <div class="input-area">
-        <!-- @ mention button: Chat only -->
-        <button v-if="view === 'chat'" class="at-btn" @click="insertAt" title="Mention a bot">@</button>
-        <!-- Director toggle: Adventure & Story only -->
-        <button v-if="view === 'adventure' || view === 'story'" class="director-toggle-btn" :class="{active: directorMode}" @click="toggleDirector" title="Director Mode">          
-          <span v-html="svg('directorGrid')"></span>
-        </button>
         <div class="chat-input-wrap">
-          <button v-if="view === 'adventure' || view === 'story'" class="image-btn-inline" @click="handleImageGenerate" :disabled="isGeneratingImage || isLoading" title="Generate Scene Image">
-            <span v-html="svg('image')"></span>
+          <!-- @ mention button: Chat only, inside input bar on far left -->
+          <button v-if="view === 'chat'" class="at-btn" @click="insertAt" title="Mention a bot">@</button>
+          <!-- Director toggle: Adventure & Story only -->
+          <button v-if="view === 'adventure' || view === 'story'" class="director-toggle-btn director-toggle-inline" :class="{active: directorMode}" @click="toggleDirector" title="Director Mode">
+            <span v-html="svg('directorGrid')"></span>
           </button>
-          <input            
+          <input
             class="chat-input"
             :class="{director: directorMode}"
             v-model="inputText"
@@ -458,6 +467,9 @@
             :disabled="inputDisabled"
             ref="chatInput"
           />
+          <button v-if="view === 'adventure' || view === 'story'" class="image-btn-inline" @click="handleImageGenerate" :disabled="isGeneratingImage || isLoading" title="Generate Scene Image">
+            <span v-html="svg('image')"></span>
+          </button>
         </div>
         <button v-if="!isLoading" class="send-btn" @click="handleSend" :disabled="!inputDisabled && !inputText.trim()">
           <span v-html="svg('send')"></span>
@@ -581,7 +593,7 @@
     <!-- Prose Edit Modal -->    
     <div v-if="modal === 'editProse'" class="modal-overlay" @click.self="modal=null">
       <div class="modal">
-        <div class="modal-title">Edit Prose Segment</div>
+        <div class="modal-title">{{ editingUserMsgId ? 'Edit Message' : (editingDirectorChunkIdx !== null ? 'Edit Director Note' : 'Edit Prose Segment') }}</div>
         <textarea class="prose-edit-textarea" v-model="editSegText" rows="6"></textarea>
         <div class="prose-edit-actions">
           <button class="btn-secondary" @click="cancelEdit(); modal=null">Cancel</button>

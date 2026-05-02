@@ -12,11 +12,21 @@ function buildSimpleChatSystem(bots, mentionedBotId) {
 
   if (mentionedBotId) {
     const bot = bots.find(b => b.id === mentionedBotId);
-    return `You are "${bot.name}", a character in a chat conversation.
+    return `You are "${bot.name}", one of the characters in an ongoing group chat.
+The other characters in this chat are:
+${botList}
+
 Your personality: ${bot.persona}
 
+CONVERSATION CONTEXT:
+- Read the full conversation history provided.
+- Respond NATURALLY in context — do NOT start with generic greetings like "hi" or "what do you want" unless the conversation actually calls for it.
+- Reference previous messages, inside jokes, or ongoing topics when relevant.
+- If the user asked a question directed at you, answer it directly.
+
 RULES:
-- Respond ONLY as ${bot.name}.
+- Respond ONLY as ${bot.name}. NEVER speak as any other character.
+- NEVER include dialogue or actions from other characters in your response.
 - Stay completely in character at all times.
 - Keep responses conversational and natural, like a real chat message.
 - Do NOT use markdown formatting, headers, or bullet points.
@@ -28,8 +38,8 @@ RULES:
 ${botList}
 
 RULES:
-- Read the conversation and decide which ONE character should respond based on context, personality fit, and who the message is directed at.
-- Respond as ONLY that one character.
+- Read the full conversation history and decide which ONE character should respond based on context, personality fit, and who the message is directed at.
+- Respond as ONLY that one character. NEVER include multiple characters in one response.
 - Start your response with the character's name followed by a colon, e.g. "Alex: Hello there!"
 - Stay completely in character.
 - Keep responses conversational and natural, like real chat messages.
@@ -264,7 +274,12 @@ async function generateImagePrompt(bots, scenario, summary, settings, onChunk = 
 
 async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk = null) {
   const systemPrompt = buildSimpleChatSystem(bots, mentionedBotId);
-  const messages = history.map(m => ({
+  
+  // Truncate history to memory depth (keep most recent N messages)
+  const depth = Math.max(5, Math.min(100, settings.memoryDepth || 20));
+  const truncatedHistory = history.length > depth ? history.slice(-depth) : history;
+  
+  const messages = truncatedHistory.map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
     content: m.role === 'user' ? m.content : `${m.botName}: ${m.content}`
   }));
@@ -272,16 +287,34 @@ async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk =
   const raw = await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
 
   // Parse response to extract bot name and content  
+  let bot, content;
   const colonIdx = raw.indexOf(':');
+  
   if (!mentionedBotId && colonIdx > 0 && colonIdx < 30) {
     const name = raw.substring(0, colonIdx).trim();
-    const content = raw.substring(colonIdx + 1).trim();
-    const bot = bots.find(b => b.name.toLowerCase() === name.toLowerCase()) || bots[0];
-    return { botId: bot.id, botName: bot.name, content };
+    content = raw.substring(colonIdx + 1).trim();
+    bot = bots.find(b => b.name.toLowerCase() === name.toLowerCase()) || bots[0];
+  } else {
+    bot = mentionedBotId ? bots.find(b => b.id === mentionedBotId) : bots[0];
+    content = raw;
   }
 
-  const bot = mentionedBotId ? bots.find(b => b.id === mentionedBotId) : bots[0];
-  return { botId: bot.id, botName: bot.name, content: raw };
+  // Strip the responding bot's own name prefix if present
+  if (content.toLowerCase().startsWith(bot.name.toLowerCase() + ':')) {
+    content = content.substring(bot.name.length + 1).trim();
+  }
+
+  // CRITICAL FIX: Truncate if any OTHER character's dialogue appears in the response
+  for (const other of bots) {
+    if (other.id === bot.id) continue;
+    const otherIdx = content.toLowerCase().indexOf(other.name.toLowerCase() + ':');
+    if (otherIdx > 0) {
+      content = content.substring(0, otherIdx).trim();
+      break;
+    }
+  }
+
+  return { botId: bot.id, botName: bot.name, content };
 }
 
 async function sendAdventureMessage(history, bots, session, isDirector, settings, onChunk = null) {

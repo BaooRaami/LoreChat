@@ -37,6 +37,8 @@ createApp({
     const editingAdvSegIdx = ref(null);
     const editingImageId = ref(null);
     const editImagePromptText = ref('');
+    const editingUserMsgId = ref(null);
+    const editingDirectorChunkIdx = ref(null);
     // Data
     const bots = ref([]);
     const chats = ref([]);
@@ -426,19 +428,88 @@ createApp({
     }
 
     function insertAt() {
-      if (!inputText.value.includes('@')) {
-        inputText.value = '@' + inputText.value;
-        onInput();
-      }
+      mentionSuggestions.value = activeBots.value;
       nextTick(() => chatInput.value?.focus());
     }
 
     function selectMention(bot) {
-      const atIdx = inputText.value.lastIndexOf('@');
-      inputText.value = inputText.value.substring(0, atIdx) + '@' + bot.name + ' ';
-      mentionedBot.value = bot;
       mentionSuggestions.value = [];
-      chatInput.value?.focus();
+      mentionedBot.value = null;
+      inputText.value = '';
+      sendMentionMessage(bot);
+    }
+
+    async function sendMentionMessage(bot) {
+      if (isLoading.value) return;
+
+      const botMsgId = DB.generateId();
+      const botMsg = { id: botMsgId, role: 'bot', botId: null, botName: '...', content: '', streaming: true, ts: Date.now() };
+      activeMessages.value.push(botMsg);
+      scrollToBottom(messagesArea);
+      isLoading.value = true;
+
+      // Inject a synthetic user mention into API history only (not displayed)
+      // so the AI has a fresh prompt to respond to
+      const syntheticUserMsg = { id: DB.generateId(), role: 'user', content: `@${bot.name}`, ts: Date.now() };
+      const apiHistory = [...activeMessages.value.filter(m => !m.streaming), syntheticUserMsg];
+
+      try {
+        const result = await AI.sendSimpleChat(
+          apiHistory,
+          activeBots.value,
+          bot.id,
+          settings.value,
+          (piece, full) => {
+            const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
+            if (idx >= 0) {
+              activeMessages.value[idx] = { ...activeMessages.value[idx], content: full };
+            }
+            scrollToBottom(messagesArea);
+          }
+        );
+
+        const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
+        if (idx >= 0) {
+          const hasContent = result.content && result.content.trim();
+          if (!hasContent) {
+            // AI returned empty — remove the blank bubble
+            activeMessages.value.splice(idx, 1);
+          } else {
+            activeMessages.value[idx] = {
+              ...activeMessages.value[idx],
+              botId: result.botId,
+              botName: result.botName,
+              content: result.content,
+              streaming: false
+            };
+            activeSession.value.messages = [...activeMessages.value];
+            activeSession.value.lastMessage = result.content.substring(0, 60);
+            activeSession.value.updatedAt = Date.now();
+            await DB.putOne('chats', toPlain(activeSession.value));
+            await loadAll();
+          }
+        }
+        scrollToBottom(messagesArea);
+      } catch (err) {
+        const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
+        if (idx >= 0) {
+          const finalContent = activeMessages.value[idx].content.trim();
+          if (finalContent) {
+            activeMessages.value[idx] = { ...activeMessages.value[idx], streaming: false };
+            activeSession.value.messages = [...activeMessages.value];
+            activeSession.value.lastMessage = finalContent.substring(0, 60);
+            activeSession.value.updatedAt = Date.now();
+            await DB.putOne('chats', toPlain(activeSession.value));
+            await loadAll();
+          } else {
+            activeMessages.value.splice(idx, 1);
+          }
+        }
+        if (err.message !== 'ABORTED') {
+          showError('AI error: ' + err.message);
+        }
+      }
+      isLoading.value = false;
     }
 
     // ===== UNIFIED SEND HANDLER =====
@@ -1009,6 +1080,38 @@ createApp({
     }
 
     function saveSegmentEditFromModal() {
+      const newContent = editSegText.value.trim();
+      if (!newContent) { cancelEdit(); modal.value = null; return; }
+
+      if (editingUserMsgId.value) {
+        // Editing a user/director message in adventure/chat mode
+        const idx = activeMessages.value.findIndex(m => m.id === editingUserMsgId.value);
+        if (idx >= 0) {
+          activeMessages.value[idx] = { ...activeMessages.value[idx], content: newContent };
+          activeSession.value.messages = [...activeMessages.value];
+          activeSession.value.updatedAt = Date.now();
+          if (view.value === 'chat') DB.putOne('chats', toPlain(activeSession.value));
+          else DB.putOne('adventures', toPlain(activeSession.value));
+        }
+        cancelEdit();
+        modal.value = null;
+        return;
+      }
+
+      if (editingDirectorChunkIdx.value !== null) {
+        // Editing a director chunk in story mode
+        const idx = editingDirectorChunkIdx.value;
+        if (storyChunks.value[idx] && storyChunks.value[idx].type === 'director') {
+          storyChunks.value[idx] = { ...storyChunks.value[idx], content: newContent };
+          activeSession.value.chunks = [...storyChunks.value];
+          activeSession.value.updatedAt = Date.now();
+          DB.putOne('stories', toPlain(activeSession.value));
+        }
+        cancelEdit();
+        modal.value = null;
+        return;
+      }
+
       if (view.value === 'adventure') {
         const msgId = editingAdvMsgId.value;
         const segIdx = editingAdvSegIdx.value;
@@ -1064,6 +1167,33 @@ createApp({
     }
 
     function deleteSegmentEditFromModal() {
+      if (editingUserMsgId.value) {
+        const idx = activeMessages.value.findIndex(m => m.id === editingUserMsgId.value);
+        if (idx >= 0) {
+          activeMessages.value.splice(idx, 1);
+          activeSession.value.messages = [...activeMessages.value];
+          activeSession.value.updatedAt = Date.now();
+          if (view.value === 'chat') DB.putOne('chats', toPlain(activeSession.value));
+          else DB.putOne('adventures', toPlain(activeSession.value));
+        }
+        cancelEdit();
+        modal.value = null;
+        return;
+      }
+
+      if (editingDirectorChunkIdx.value !== null) {
+        const idx = editingDirectorChunkIdx.value;
+        if (storyChunks.value[idx] && storyChunks.value[idx].type === 'director') {
+          storyChunks.value.splice(idx, 1);
+          activeSession.value.chunks = [...storyChunks.value];
+          activeSession.value.updatedAt = Date.now();
+          DB.putOne('stories', toPlain(activeSession.value));
+        }
+        cancelEdit();
+        modal.value = null;
+        return;
+      }
+
       if (view.value === 'adventure') {
         const msgId = editingAdvMsgId.value;
         const segIdx = editingAdvSegIdx.value;
@@ -1100,6 +1230,24 @@ createApp({
       tappedSegKey.value = null;
       editingAdvMsgId.value = null;
       editingAdvSegIdx.value = null;
+      editingUserMsgId.value = null;
+      editingDirectorChunkIdx.value = null;
+    }
+
+    function startEditUserMessage(msgId) {
+      const msg = activeMessages.value.find(m => m.id === msgId);
+      if (!msg) return;
+      editingUserMsgId.value = msgId;
+      editSegText.value = msg.content;
+      modal.value = 'editProse';
+    }
+
+    function startEditDirectorChunk(chunkIdx) {
+      const chunk = storyChunks.value[chunkIdx];
+      if (!chunk || chunk.type !== 'director') return;
+      editingDirectorChunkIdx.value = chunkIdx;
+      editSegText.value = chunk.content;
+      modal.value = 'editProse';
     }
 
     function openEditImagePrompt(imageId) {
@@ -1264,20 +1412,21 @@ createApp({
       saveSettings,
       openBotModal, editBot, saveBot, deleteBot, deleteBotFromModal, exportBots,
       openCreateModal, toggleBotSelection, createSession,
-      openChat, clearSession, onInput, insertAt, selectMention, sendMessage,
+      openChat, clearSession, onInput, insertAt, selectMention, sendMentionMessage, sendMessage,
       openAdventure, sendAdventureMessage,
       openStory, generateStoryChunk, sendStoryMessage,
       canNavUp, canNavDown, scrollToChunkDivider, updateChunkNavState,
       editingSegKey, editSegText, editSegType,
       isTouchDevice, tappedSegKey,
-      editingAdvMsgId, editingAdvSegIdx,
       startEditSegment, cancelEdit, saveSegmentEdit, saveSegmentEditFromModal, deleteSegmentEdit, deleteSegmentEditFromModal, handleSegTap,
       deleteChat, deleteAdventure, deleteStory,
       exportAll, triggerImport, importAll,
       summaryModalOpen, openSummaryModal,
       galleryOpen, openGallery, storyGalleryImages, adventureGalleryImages, galleryImages,
       handleSend, handleImageGenerate, redoImage, reimagineImage, removeImage, isGeneratingImage, getImageUrl,
+      editingAdvMsgId, editingAdvSegIdx,
       editingImageId, editImagePromptText, openEditImagePrompt, saveEditImagePrompt,
+      editingUserMsgId, editingDirectorChunkIdx, startEditUserMessage, startEditDirectorChunk,
       stopGeneration,
       toggleDirector, svg
     };
