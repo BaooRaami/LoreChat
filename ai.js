@@ -38,7 +38,8 @@ RULES:
 }
 
 function buildAdventureSystem(bots, scenario, characterName, characterProfile, isDirector) {
-  const botList = bots.map(b =>
+  const aiBots = bots.filter(b => !b.isYou);
+  const botList = aiBots.map(b =>
     `- Name: "${b.name}"\n  Role/Personality: ${b.persona}`
   ).join('\n\n');
 
@@ -86,9 +87,13 @@ The player's character: "${characterName}" — ${characterProfile}
 RULES:
 - The player describes what their character "${characterName}" does or says.
 - React to the player's action as the story world and its characters.
+- NEVER speak as "${characterName}". Never write [${characterName}]: in your response. The player speaks for themselves.
 - Choose ONE character from the list who is most relevant to respond or react.
 - Optionally add brief narrator text to set the scene, then the character responds.
 - Format: "[NARRATOR]: brief scene text (optional)\n[CHARACTER_NAME]: dialogue or action"
+- If multiple characters respond, EACH must have their own separate [CHARACTER_NAME]: block.
+- Every single line of character speech or action MUST be inside a [CHARACTER_NAME]: block.
+- NEVER write character lines outside of a [CHARACTER_NAME]: block. Loose prose is only allowed inside [NARRATOR]:.
 - Keep responses immersive, dramatic, and concise (2-4 sentences total).
 - Advance the story meaningfully with each response.
 - The story should feel alive, consequences should matter.
@@ -288,38 +293,43 @@ async function sendAdventureMessage(history, bots, session, isDirector, settings
     isDirector
   );
 
-  const window = history.slice(-settings.memoryDepth);
-  const messages = window.map(m => ({
+  const textHistory = history.filter(m => !m.isImage && !m.isPromptStreaming);
+  const messages = textHistory.map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
     content: m.isDirector ? `[DIRECTOR]: ${m.content}` : m.content
   }));
 
   const raw = await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
 
-  // Parse narrator + character sections  
-  const narratorMatch = raw.match(/\[NARRATOR\]:\s*([\s\S]*?)(?=\[[\w\s]+\]:|$)/i);
-  const charMatch = raw.match(/\[([^\]]+)\]:\s*([\s\S]+)$/i);
+  const aiBots = bots.filter(b => !b.isYou);
 
-  if (charMatch) {
-    const charName = charMatch[1].trim();
-    const charContent = charMatch[2].trim();
-    const narratorText = narratorMatch ? narratorMatch[1].trim() : '';
-    const bot = bots.find(b => b.name.toLowerCase() === charName.toLowerCase()) || bots[0];
-    return {
-      narrator: narratorText,
-      botId: bot.id,
-      botName: bot.name,
-      content: charContent
-    };
+  // Extract narrator block
+  const narratorMatch = raw.match(/\[NARRATOR\]:\s*([\s\S]*?)(?=\[[^\]]+\]:|$)/i);
+  const narratorText = narratorMatch ? narratorMatch[1].trim() : '';
+
+  // Extract ALL [CHARACTER]: blocks
+  const charBlockPattern = /\[([^\]]+)\]:\s*([\s\S]*?)(?=\[[^\]]+\]:|$)/gi;
+  const results = [];
+  let match;
+  while ((match = charBlockPattern.exec(raw)) !== null) {
+    const charName = match[1].trim();
+    if (charName.toUpperCase() === 'NARRATOR') continue;
+    if (charName.toLowerCase() === (session.characterName || 'the player').toLowerCase()) continue;    
+    const charContent = match[2].trim();
+    if (!charContent) continue;
+    const bot = aiBots.find(b => b.name.toLowerCase() === charName.toLowerCase()) || aiBots[0];
+    results.push({ narrator: '', botId: bot.id, botName: bot.name, content: charContent });
   }
 
-  // Fallback: treat whole response as narrator/bot reply
-  return {
-    narrator: '',
-    botId: bots[0].id,
-    botName: bots[0].name,
-    content: raw
-  };
+  // Attach narrator only to the first result
+  if (results.length > 0) {
+    results[0].narrator = narratorText;
+    return results;
+  }
+
+  // Fallback: whole response as one message from first AI bot
+  const fallbackBot = aiBots[0] || bots[0];
+  return [{ narrator: narratorText, botId: fallbackBot.id, botName: fallbackBot.name, content: raw }];
 }
 
 async function generateStoryChunk(existingChunks, bots, session, settings, directorInput = null, onChunk = null) {

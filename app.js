@@ -25,7 +25,7 @@ createApp({
     const directorMode = ref(false);
     const chatMenu = ref(false);
     const summaryModalOpen = ref(false);
-    const galleryOpen = ref(false);    
+    const galleryOpen = ref(false);
     const canNavUp = ref(false);
     const canNavDown = ref(false);
     const editingSegKey = ref(null);
@@ -33,6 +33,8 @@ createApp({
     const editSegType = ref('narrate');
     const isTouchDevice = ref(false);
     const tappedSegKey = ref(null);
+    const editingAdvMsgId = ref(null);
+    const editingAdvSegIdx = ref(null);
     const editingImageId = ref(null);
     const editImagePromptText = ref('');
     // Data
@@ -161,6 +163,7 @@ createApp({
         .map(seg => ({
           type: seg.type === 'plain' ? 'narrate' : seg.type,
           text: seg.text,
+          raw: seg.raw,
           isDialogue: seg.type === 'dialogue'
         }));
     }
@@ -401,7 +404,7 @@ createApp({
       activeSession.value.messages = [];
       activeSession.value.chunks = [];
       activeSession.value.lastMessage = '';
-      if (view.value === 'story') activeSession.value.summary = '';
+      if (view.value === 'story' || view.value === 'adventure') activeSession.value.summary = '';
       activeSession.value.updatedAt = Date.now();
       if (view.value === 'chat') await DB.putOne('chats', toPlain(activeSession.value));
       if (view.value === 'adventure') await DB.putOne('adventures', toPlain(activeSession.value));
@@ -685,11 +688,19 @@ createApp({
       storyChunks.value.filter(c => c.type === 'image' && c.imageUrl)
     );
 
+    const adventureGalleryImages = computed(() =>
+      activeMessages.value.filter(m => m.isImage && m.imageUrl)
+    );
+
+    const galleryImages = computed(() =>
+      view.value === 'adventure' ? adventureGalleryImages.value : storyGalleryImages.value
+    );
+
     function openGallery() {
       galleryOpen.value = true;
     }
 
-    function toggleDirector() {      
+    function toggleDirector() {
       directorMode.value = !directorMode.value;
       nextTick(() => chatInput.value?.focus());
     }
@@ -804,6 +815,7 @@ createApp({
       inputText.value = '';
       directorMode.value = false;
       scrollToBottom(messagesArea);
+
       const botMsgId = DB.generateId();
       const botMsg = { id: botMsgId, role: 'bot', botId: null, botName: '...', content: '', streaming: true, ts: Date.now() };
       activeMessages.value.push(botMsg);
@@ -811,11 +823,11 @@ createApp({
       isLoading.value = true;
 
       try {
-        const result = await AI.sendAdventureMessage(
+        const results = await AI.sendAdventureMessage(
           activeMessages.value.filter(m => !m.streaming),
           activeBots.value,
           activeSession.value,
-          directorMode.value,
+          userMsg.isDirector,
           settings.value,
           (piece, full) => {
             const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
@@ -829,23 +841,37 @@ createApp({
         const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
         if (idx >= 0) activeMessages.value.splice(idx, 1);
 
-        if (result.narrator) {
+        for (const result of results) {
+          if (result.narrator) {
+            activeMessages.value.push({
+              id: DB.generateId(), role: 'bot', botId: null, botName: 'Narrator',
+              content: result.narrator, isNarrator: true, ts: Date.now()
+            });
+          }
           activeMessages.value.push({
-            id: DB.generateId(), role: 'bot', botId: null, botName: 'Narrator',
-            content: result.narrator, isNarrator: true, ts: Date.now()
+            id: DB.generateId(), role: 'bot', botId: result.botId, botName: result.botName,
+            content: result.content, isDirector: false, ts: Date.now()
           });
         }
-
-        activeMessages.value.push({
-          id: DB.generateId(), role: 'bot', botId: result.botId, botName: result.botName,
-          content: result.content, isDirector: false, ts: Date.now()
-        });
 
         activeSession.value.messages = [...activeMessages.value];
         activeSession.value.updatedAt = Date.now();
         await DB.putOne('adventures', toPlain(activeSession.value));
         await loadAll();
         scrollToBottom(messagesArea);
+
+        // Generate summary in background
+        const textMessages = activeMessages.value.filter(m => !m.isImage && !m.isPromptStreaming);
+        AI.generateStorySummary(
+          textMessages.map(m => m.content).filter(Boolean),
+          activeBots.value,
+          activeSession.value,
+          settings.value
+        ).then(async (summary) => {
+          activeSession.value.summary = summary;
+          await DB.putOne('adventures', toPlain(activeSession.value));
+        }).catch(() => { /* silently ignore */ });
+
       } catch (err) {
         const idx = activeMessages.value.findIndex(m => m.id === botMsgId);
         if (idx >= 0) {
@@ -970,32 +996,51 @@ createApp({
     }
 
     // ===== STORY SEGMENT EDIT =====
-    function startEditSegment(chunkIdx, segIdx, seg) {
-      editingSegKey.value = `${chunkIdx}-${segIdx}`;
-      tappedSegKey.value = seg;
+    function startEditSegment(chunkOrMsgId, segIdx, seg) {
+      if (view.value === 'adventure') {
+        editingAdvMsgId.value = chunkOrMsgId;
+        editingAdvSegIdx.value = segIdx;
+      } else {
+        editingSegKey.value = `${chunkOrMsgId}-${segIdx}`;
+        tappedSegKey.value = seg;
+      }
       editSegText.value = seg.raw;
       modal.value = 'editProse';
     }
 
     function saveSegmentEditFromModal() {
-      // Parse the key to get chunk and segment indices
-      if (!editingSegKey.value) return;
-      const [chunkIdx, segIdx] = editingSegKey.value.split('-').map(Number);
-      const oldSeg = tappedSegKey.value;
-      if (!oldSeg) return;
-
-      const newRaw = editSegText.value.trim();
-      const chunk = storyChunks.value[chunkIdx];
-
-      if (typeof chunk === 'string') {
-        storyChunks.value[chunkIdx] = chunk.replace(oldSeg.raw, newRaw);
+      if (view.value === 'adventure') {
+        const msgId = editingAdvMsgId.value;
+        const segIdx = editingAdvSegIdx.value;
+        if (msgId == null || segIdx == null) return;
+        const idx = activeMessages.value.findIndex(m => m.id === msgId);
+        if (idx < 0) { cancelEdit(); modal.value = null; return; }
+        const msg = activeMessages.value[idx];
+        const segs = parseProseSegments(msg.content);
+        const oldSeg = segs[segIdx];
+        if (!oldSeg) { cancelEdit(); modal.value = null; return; }
+        const newRaw = editSegText.value.trim();
+        const newContent = msg.content.replace(oldSeg.raw, newRaw);
+        activeMessages.value[idx] = { ...msg, content: newContent };
+        activeSession.value.messages = [...activeMessages.value];
+        activeSession.value.updatedAt = Date.now();
+        DB.putOne('adventures', toPlain(activeSession.value));
+      } else {
+        if (!editingSegKey.value) return;
+        const [chunkIdx, segIdx] = editingSegKey.value.split('-').map(Number);
+        const oldSeg = tappedSegKey.value;
+        if (!oldSeg) return;
+        const newRaw = editSegText.value.trim();
+        const chunk = storyChunks.value[chunkIdx];
+        if (typeof chunk === 'string') {
+          storyChunks.value[chunkIdx] = chunk.replace(oldSeg.raw, newRaw);
+        }
+        activeSession.value.chunks = [...storyChunks.value];
+        activeSession.value.updatedAt = Date.now();
+        DB.putOne('stories', toPlain(activeSession.value));
       }
-
       cancelEdit();
       modal.value = null;
-      activeSession.value.chunks = [...storyChunks.value];
-      activeSession.value.updatedAt = Date.now();
-      DB.putOne('stories', toPlain(activeSession.value));
     }
 
     async function deleteSegmentEdit(chunkIdx, segIdx) {
@@ -1019,9 +1064,32 @@ createApp({
     }
 
     function deleteSegmentEditFromModal() {
-      if (!editingSegKey.value) return;
-      const [chunkIdx, segIdx] = editingSegKey.value.split('-').map(Number);
-      deleteSegmentEdit(chunkIdx, segIdx);
+      if (view.value === 'adventure') {
+        const msgId = editingAdvMsgId.value;
+        const segIdx = editingAdvSegIdx.value;
+        if (msgId == null || segIdx == null) { modal.value = null; return; }
+        const idx = activeMessages.value.findIndex(m => m.id === msgId);
+        if (idx < 0) { modal.value = null; return; }
+        const msg = activeMessages.value[idx];
+        const segs = parseProseSegments(msg.content);
+        const segToDelete = segs[segIdx];
+        if (segToDelete && segToDelete.raw) {
+          const newContent = msg.content.replace(segToDelete.raw, '').replace(/\s+/g, ' ').trim();
+          if (!newContent) {
+            activeMessages.value.splice(idx, 1);
+          } else {
+            activeMessages.value[idx] = { ...msg, content: newContent };
+          }
+          activeSession.value.messages = [...activeMessages.value];
+          activeSession.value.updatedAt = Date.now();
+          DB.putOne('adventures', toPlain(activeSession.value));
+        }
+      } else {
+        if (!editingSegKey.value) return;
+        const [chunkIdx, segIdx] = editingSegKey.value.split('-').map(Number);
+        deleteSegmentEdit(chunkIdx, segIdx);
+      }
+      cancelEdit();
       modal.value = null;
     }
 
@@ -1030,6 +1098,8 @@ createApp({
       editSegText.value = '';
       editSegType.value = 'narrate';
       tappedSegKey.value = null;
+      editingAdvMsgId.value = null;
+      editingAdvSegIdx.value = null;
     }
 
     function openEditImagePrompt(imageId) {
@@ -1200,11 +1270,12 @@ createApp({
       canNavUp, canNavDown, scrollToChunkDivider, updateChunkNavState,
       editingSegKey, editSegText, editSegType,
       isTouchDevice, tappedSegKey,
+      editingAdvMsgId, editingAdvSegIdx,
       startEditSegment, cancelEdit, saveSegmentEdit, saveSegmentEditFromModal, deleteSegmentEdit, deleteSegmentEditFromModal, handleSegTap,
       deleteChat, deleteAdventure, deleteStory,
       exportAll, triggerImport, importAll,
       summaryModalOpen, openSummaryModal,
-      galleryOpen, openGallery, storyGalleryImages,      
+      galleryOpen, openGallery, storyGalleryImages, adventureGalleryImages, galleryImages,
       handleSend, handleImageGenerate, redoImage, reimagineImage, removeImage, isGeneratingImage, getImageUrl,
       editingImageId, editImagePromptText, openEditImagePrompt, saveEditImagePrompt,
       stopGeneration,

@@ -226,11 +226,11 @@
             <span v-html="svg('kebab')"></span>
           </button>
           <div v-if="chatMenu" class="kebab-dropdown">
-            <div v-if="view === 'story'" class="kebab-item" @click="openSummaryModal(); chatMenu = false">
+            <div v-if="view === 'story' || view === 'adventure'" class="kebab-item" @click="openSummaryModal(); chatMenu = false">              
               <span v-html="svg('summary')"></span>
               Summary
             </div>
-            <div v-if="view === 'story'" class="kebab-item" @click="openGallery(); chatMenu = false">
+            <div v-if="view === 'story' || view === 'adventure'" class="kebab-item" @click="openGallery(); chatMenu = false">              
               <span v-html="svg('image')"></span>
               Gallery
             </div>            
@@ -297,19 +297,25 @@
             </div>
             <!-- After streaming, split into segments -->
             <template v-else v-for="(unit, ui) in getAdventureRenderUnits(msg)" :key="msg.id + '-' + ui">
-              <div v-if="unit.isDialogue" class="message-row bot-row">
+              <div v-if="unit.isDialogue" class="message-row bot-row prose-seg-wrapper" :class="{ tapped: isTouchDevice && tappedSegKey === msg.id + '-' + ui }" @click="handleSegTap(msg.id + '-' + ui)">
                 <div class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
                   {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
                 </div>
                 <div class="message-wrap">
                   <div class="msg-name">{{ msg.botName }}</div>
-                  <div class="message-bubble bot-bubble">
+                  <div class="message-bubble bot-bubble" style="position:relative;">
                     <span class="prose-quote-mark">"</span>{{ unit.text }}<span class="prose-quote-mark">"</span>
+                    <button class="prose-edit-btn adv-prose-edit-btn" @click.stop="startEditSegment(msg.id, ui, unit)" title="Edit">
+                      <span v-html="svg('edit')"></span>
+                    </button>
                   </div>
                 </div>
               </div>
-              <div v-else :class="'prose-seg prose-' + unit.type + ' adventure-prose-block'">
+              <div v-else :class="'prose-seg prose-' + unit.type + ' adventure-prose-block prose-seg-wrapper'" :class="{ tapped: isTouchDevice && tappedSegKey === msg.id + '-' + ui }" @click="handleSegTap(msg.id + '-' + ui)">
                 {{ unit.text }}
+                <button class="prose-edit-btn" @click.stop="startEditSegment(msg.id, ui, unit)" title="Edit">
+                  <span v-html="svg('edit')"></span>
+                </button>
               </div>
             </template>
           </template>
@@ -552,19 +558,19 @@
     <div v-if="galleryOpen" class="modal-overlay gallery-overlay" @click.self="galleryOpen = false">
       <div class="modal gallery-modal">
         <div class="modal-title">
-          Story Gallery
+          {{ view === 'adventure' ? 'Adventure Gallery' : 'Story Gallery' }}          
           <button class="icon-btn gallery-close-btn" @click="galleryOpen = false">
             <span v-html="svg('close')"></span>
           </button>
         </div>
-        <div v-if="storyGalleryImages.length === 0" class="gallery-empty">
+        <div v-if="galleryImages.length === 0" class="gallery-empty">
           <span v-html="svg('image')"></span>
           <p>No images yet</p>
-          <span>Generate images in the story to see them here</span>
+          <span>Generate images to see them here</span>
         </div>
         <div v-else class="gallery-scroll">
-          <div v-for="(item, index) in storyGalleryImages" :key="item.ts" class="gallery-item">
-            <div class="gallery-caption">Image {{ index + 1 }} of {{ storyGalleryImages.length }}</div>
+          <div v-for="(item, index) in galleryImages" :key="item.ts || item.id" class="gallery-item">            
+            <div class="gallery-caption">Image {{ index + 1 }} of {{ galleryImages.length }}</div>
             <img :src="item.imageUrl" :alt="'Image ' + (index + 1)" class="gallery-img" />
           </div>
         </div>
