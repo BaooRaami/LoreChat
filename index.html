@@ -230,6 +230,10 @@
               <span v-html="svg('summary')"></span>
               Summary
             </div>
+            <div v-if="view === 'story'" class="kebab-item" @click="openGallery(); chatMenu = false">
+              <span v-html="svg('image')"></span>
+              Gallery
+            </div>            
             <div class="kebab-item" @click="clearSession(); chatMenu = false">
               <span v-html="svg('clear')"></span>
               {{ kebabClearLabel }}
@@ -268,6 +272,9 @@
               <img v-if="msg.imageUrl" :src="msg.imageUrl" alt="Generated scene" />
               <button v-if="msg.imageUrl" class="image-remove-btn" @click="removeImage(msg.id)" title="Remove image" :disabled="isGeneratingImage">
                 <span v-html="svg('close')"></span>
+              </button>
+              <button v-if="msg.imageUrl" class="image-edit-prompt-btn" @click="openEditImagePrompt(msg.id)" title="Edit prompt" :disabled="isGeneratingImage">
+                <span v-html="svg('edit')"></span>
               </button>
               <button v-if="msg.imageUrl" class="image-redo-btn" @click="redoImage(msg.id)" title="Redo (same prompt, new seed)" :disabled="isGeneratingImage">
                 <span v-html="svg('redo')"></span>
@@ -356,6 +363,9 @@
             <img v-if="chunk.imageUrl" :src="chunk.imageUrl" alt="Generated scene" />
             <button v-if="chunk.imageUrl" class="image-remove-btn" @click="removeImage(chunk.ts)" title="Remove image" :disabled="isGeneratingImage">
               <span v-html="svg('close')"></span>
+            </button>
+            <button v-if="chunk.imageUrl" class="image-edit-prompt-btn" @click="openEditImagePrompt(chunk.ts)" title="Edit prompt" :disabled="isGeneratingImage">
+              <span v-html="svg('edit')"></span>
             </button>
             <button v-if="chunk.imageUrl" class="image-redo-btn" @click="redoImage(chunk.ts)" title="Redo (same prompt, new seed)" :disabled="isGeneratingImage">
               <span v-html="svg('redo')"></span>
@@ -538,7 +548,31 @@
       </div>
     </div>
 
-    <!-- Prose Edit Modal -->
+    <!-- Gallery Modal -->
+    <div v-if="galleryOpen" class="modal-overlay gallery-overlay" @click.self="galleryOpen = false">
+      <div class="modal gallery-modal">
+        <div class="modal-title">
+          Story Gallery
+          <button class="icon-btn gallery-close-btn" @click="galleryOpen = false">
+            <span v-html="svg('close')"></span>
+          </button>
+        </div>
+        <div v-if="storyGalleryImages.length === 0" class="gallery-empty">
+          <span v-html="svg('image')"></span>
+          <p>No images yet</p>
+          <span>Generate images in the story to see them here</span>
+        </div>
+        <div v-else class="gallery-scroll">
+          <div v-for="(item, index) in storyGalleryImages" :key="item.ts" class="gallery-item">
+            <div class="gallery-caption">Image {{ index + 1 }} of {{ storyGalleryImages.length }}</div>
+            <img :src="item.imageUrl" :alt="'Image ' + (index + 1)" class="gallery-img" />
+          </div>
+        </div>
+        <button class="btn-primary full-width" @click="galleryOpen = false">Close</button>
+      </div>
+    </div>
+
+    <!-- Prose Edit Modal -->    
     <div v-if="modal === 'editProse'" class="modal-overlay" @click.self="modal=null">
       <div class="modal">
         <div class="modal-title">Edit Prose Segment</div>
@@ -547,6 +581,18 @@
           <button class="btn-secondary" @click="cancelEdit(); modal=null">Cancel</button>
           <button class="btn-danger" @click="deleteSegmentEditFromModal()">Delete</button>
           <button class="btn-primary" @click="saveSegmentEditFromModal()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Image Prompt Modal -->
+    <div v-if="modal === 'editImagePrompt'" class="modal-overlay" @click.self="modal=null">
+      <div class="modal">
+        <div class="modal-title">Edit Image Prompt</div>
+        <textarea class="prose-edit-textarea" v-model="editImagePromptText" rows="7"></textarea>
+        <div class="prose-edit-actions">
+          <button class="btn-secondary" @click="modal=null">Cancel</button>
+          <button class="btn-primary" @click="saveEditImagePrompt()">Save & Generate</button>
         </div>
       </div>
     </div>

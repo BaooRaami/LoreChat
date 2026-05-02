@@ -25,6 +25,7 @@ createApp({
     const directorMode = ref(false);
     const chatMenu = ref(false);
     const summaryModalOpen = ref(false);
+    const galleryOpen = ref(false);    
     const canNavUp = ref(false);
     const canNavDown = ref(false);
     const editingSegKey = ref(null);
@@ -32,6 +33,8 @@ createApp({
     const editSegType = ref('narrate');
     const isTouchDevice = ref(false);
     const tappedSegKey = ref(null);
+    const editingImageId = ref(null);
+    const editImagePromptText = ref('');
     // Data
     const bots = ref([]);
     const chats = ref([]);
@@ -678,7 +681,15 @@ createApp({
       isGeneratingImage.value = false;
     }
 
-    function toggleDirector() {
+    const storyGalleryImages = computed(() =>
+      storyChunks.value.filter(c => c.type === 'image' && c.imageUrl)
+    );
+
+    function openGallery() {
+      galleryOpen.value = true;
+    }
+
+    function toggleDirector() {      
       directorMode.value = !directorMode.value;
       nextTick(() => chatInput.value?.focus());
     }
@@ -1021,6 +1032,65 @@ createApp({
       tappedSegKey.value = null;
     }
 
+    function openEditImagePrompt(imageId) {
+      if (view.value === 'adventure') {
+        const msg = activeMessages.value.find(m => m.id === imageId);
+        if (msg) editImagePromptText.value = msg.imagePrompt || '';
+      } else if (view.value === 'story') {
+        const chunk = storyChunks.value.find(c => c.ts === imageId && c.type === 'image');
+        if (chunk) editImagePromptText.value = chunk.prompt || '';
+      }
+      editingImageId.value = imageId;
+      modal.value = 'editImagePrompt';
+    }
+
+    async function saveEditImagePrompt() {
+      const imageId = editingImageId.value;
+      const newPrompt = editImagePromptText.value.trim();
+      if (!newPrompt || !imageId) return;
+      modal.value = null;
+      editingImageId.value = null;
+      editImagePromptText.value = '';
+
+      if (view.value === 'adventure') {
+        const idx = activeMessages.value.findIndex(m => m.id === imageId);
+        if (idx >= 0) {
+          activeMessages.value[idx] = { ...activeMessages.value[idx], imagePrompt: newPrompt, imageUrl: null };
+        }
+      } else if (view.value === 'story') {
+        const idx = storyChunks.value.findIndex(c => c.ts === imageId && c.type === 'image');
+        if (idx >= 0) {
+          storyChunks.value[idx] = { ...storyChunks.value[idx], prompt: newPrompt, imageUrl: null };
+        }
+      }
+
+      isGeneratingImage.value = true;
+      try {
+        const imageUrl = getImageUrl(newPrompt, Math.floor(Math.random() * 2147483647));
+        const img = new Image();
+        img.onload = async () => {
+          if (view.value === 'adventure') {
+            const idx = activeMessages.value.findIndex(m => m.id === imageId);
+            if (idx >= 0) activeMessages.value[idx] = { ...activeMessages.value[idx], imageUrl };
+            activeSession.value.messages = [...activeMessages.value];
+            await DB.putOne('adventures', toPlain(activeSession.value));
+          } else if (view.value === 'story') {
+            const idx = storyChunks.value.findIndex(c => c.ts === imageId && c.type === 'image');
+            if (idx >= 0) storyChunks.value[idx] = { ...storyChunks.value[idx], imageUrl };
+            activeSession.value.chunks = [...storyChunks.value];
+            await DB.putOne('stories', toPlain(activeSession.value));
+          }
+          await loadAll();
+          isGeneratingImage.value = false;
+        };
+        img.onerror = () => { isGeneratingImage.value = false; };
+        img.src = imageUrl;
+      } catch (err) {
+        showError('Image error: ' + err.message);
+        isGeneratingImage.value = false;
+      }
+    }
+
     function handleSegTap(key) {
       if (!isTouchDevice.value) return;
       tappedSegKey.value = (tappedSegKey.value === key) ? null : key;
@@ -1134,7 +1204,9 @@ createApp({
       deleteChat, deleteAdventure, deleteStory,
       exportAll, triggerImport, importAll,
       summaryModalOpen, openSummaryModal,
+      galleryOpen, openGallery, storyGalleryImages,      
       handleSend, handleImageGenerate, redoImage, reimagineImage, removeImage, isGeneratingImage, getImageUrl,
+      editingImageId, editImagePromptText, openEditImagePrompt, saveEditImagePrompt,
       stopGeneration,
       toggleDirector, svg
     };
