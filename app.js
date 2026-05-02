@@ -276,6 +276,12 @@ createApp({
       setTimeout(() => { settingsSaved.value = false; }, 2000);
     }
 
+    watch(settings, async () => {
+      await DB.putOne('settings', { id: 'main', ...settings.value });
+      settingsSaved.value = true;
+      setTimeout(() => { settingsSaved.value = false; }, 1500);
+    }, { deep: true });
+
     // ===== LOAD DATA =====
     async function loadAll() {
       bots.value = (await DB.getAll('bots')).sort((a, b) => (b.isYou ? 1 : 0) - (a.isYou ? 1 : 0));

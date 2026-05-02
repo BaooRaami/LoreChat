@@ -30,36 +30,39 @@
         <div class="settings-section">
           <div class="settings-label">Default Model</div>
           <select class="text-input" v-model="settings.model">
+            <option value="mistral">Mistral</option>
             <option value="openai">OpenAI (GPT-4o)</option>
             <option value="claude">Claude</option>
-            <option value="mistral">Mistral</option>
             <option value="gemini">Gemini</option>
             <option value="deepseek">DeepSeek</option>
           </select>
         </div>
-        <div class="settings-section">
-          <div class="settings-label">Memory Depth (messages)</div>
-          <input class="text-input" type="number" v-model.number="settings.memoryDepth" min="5" max="100" />
+        <div class="settings-row-2col">
+          <div class="settings-section">
+            <div class="settings-label">Messages Depth</div>
+            <input class="text-input" type="number" v-model.number="settings.memoryDepth" min="5" max="100" />
+          </div>
+          <div class="settings-section">
+            <div class="settings-label">Story Chunk Size</div>
+            <select class="text-input" v-model="settings.storyChunkSize">
+              <option value="short">Short (1-2 paragraphs)</option>
+              <option value="medium">Medium (2-3 paragraphs)</option>
+              <option value="long">Long (full scene)</option>
+            </select>
+          </div>
         </div>
-        <div class="settings-section">
-          <div class="settings-label">Story Chunk Size</div>
-          <select class="text-input" v-model="settings.storyChunkSize">
-            <option value="short">Short (1-2 paragraphs)</option>
-            <option value="medium">Medium (2-3 paragraphs)</option>
-            <option value="long">Long (full scene)</option>
-          </select>
-        </div>
-        <button class="btn-primary full-width" @click="saveSettings()">Save Settings</button>
         <div class="settings-section mt-lg">
           <div class="settings-label">Data Management</div>
-          <button class="btn-secondary full-width mb-sm" @click="exportAll()">
-            <span v-html="svg('export')"></span>
-            Export All Data
-          </button>
-          <button class="btn-secondary full-width" @click="triggerImport()">
-            <span v-html="svg('import')"></span>
-            Import Data
-          </button>
+          <div class="settings-row-2col">
+            <button class="btn-secondary full-width" @click="exportAll()">
+              <span v-html="svg('export')"></span>
+              Export All Data
+            </button>
+            <button class="btn-secondary full-width" @click="triggerImport()">
+              <span v-html="svg('import')"></span>
+              Import Data
+            </button>
+          </div>
           <input type="file" ref="importFile" accept=".json" style="display:none" @change="importAll($event)" />
         </div>
         <div v-if="settingsSaved" class="toast">Settings saved!</div>
@@ -484,26 +487,31 @@
     <div v-if="modal === 'bot'" class="modal-overlay" @click.self="modal=null">
       <div class="modal">
         <div class="modal-title">{{ editingBot?.id ? 'Edit Bot' : 'New Bot' }}</div>
-        <div class="color-row">
+        <div class="bot-customizer-row">
+          <div class="bot-customizer-col">
+            <div class="settings-label">Color</div>
+            <div class="color-swatches-scroll">
+              <div v-for="c in botColors" :key="c" class="swatch" :style="{background: c}" :class="{selected: editingBot.color===c}" @click="editingBot.color=c"></div>
+            </div>
+          </div>
+          <div class="bot-customizer-col">
+            <div class="settings-label emoji-picker-label">Emoji</div>            
+            <div class="emoji-grid">
+              <span
+                v-for="em in botEmojis"
+                :key="em"
+                :class="['emoji-option', editingBot.emoji === em ? 'selected' : '']"
+                @click="editingBot.emoji = (editingBot.emoji === em ? '' : em)"
+              >{{ em }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="bot-preview-avatar-row">
           <div class="bot-preview-avatar" :style="{background: editingBot.color}">
             {{ editingBot.emoji ? editingBot.emoji : (editingBot.name ? editingBot.name[0].toUpperCase() : '?') }}
           </div>
-          <div class="color-swatches">
-            <div v-for="c in botColors" :key="c" class="swatch" :style="{background: c}" :class="{selected: editingBot.color===c}" @click="editingBot.color=c"></div>
-          </div>
-        </div>
-        <div class="emoji-picker-section">
-          <div class="settings-label emoji-picker-label">Avatar Emoji <span class="emoji-clear-hint" v-if="editingBot.emoji" @click="editingBot.emoji=''">✕ Clear</span></div>
-          <div class="emoji-grid">
-            <span
-              v-for="em in botEmojis"
-              :key="em"
-              :class="['emoji-option', editingBot.emoji === em ? 'selected' : '']"
-              @click="editingBot.emoji = (editingBot.emoji === em ? '' : em)"
-            >{{ em }}</span>
-          </div>
-        </div>
-        <input class="text-input" v-model="editingBot.name" placeholder="Bot name..." />
+          <input class="text-input" v-model="editingBot.name" placeholder="Bot name..." />
+        </div>        
         <textarea class="text-input mt-sm" v-model="editingBot.persona" rows="5" placeholder="Describe this bot's personality, role, tone, traits..."></textarea>
         <div class="modal-actions">
           <button class="btn-secondary" @click="modal=null">Cancel</button>

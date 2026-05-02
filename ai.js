@@ -55,7 +55,7 @@ Rules:
 - Put the prefix at the very start, followed by a space, then the content
 - The prefix applies until the end of the sentence (period, exclamation mark, or question mark)
 - Example: NN The room is cold. AA Shivers slightly. DD It's freezing in here. TT I hope the heat comes on soon.
-`;  if (isDirector) {
+`; if (isDirector) {
     return `You are the narrator and world engine of an interactive story.
 The story world: ${scenario}
 
@@ -135,7 +135,8 @@ Rules:
 - Each sentence MUST start with one of these four prefixes (NN, AA, TT, DD)
 - Put the prefix at the very start, followed by a space, then the content
 - The prefix applies until the end of the sentence (period, exclamation mark, or question mark)
-- Example: NN The room is cold. AA Shivers slightly. DD It's freezing in here. TT I hope the heat comes on soon.`;}
+- Example: NN The room is cold. AA Shivers slightly. DD It's freezing in here. TT I hope the heat comes on soon.`;
+}
 
 // ============================================================
 // API CALL
@@ -229,7 +230,7 @@ function buildImagePromptSystem(bots, scenario, summary) {
   const summaryBlock = summary ? `\nStory summary so far:\n${summary}` : '';
 
   return `You are an expert visual prompt engineer for AI image generation.
-You create vivid, detailed image prompts (~200 words) for Pollinations AI image generator.
+You create vivid, detailed image prompts (700–1000 characters) for Pollinations AI image generator.
 
 Scenario: ${scenario}
 
@@ -238,13 +239,12 @@ ${botList}
 ${summaryBlock}
 
 RULES:
-- Write ONE cohesive image prompt of roughly 200 words.
-- Describe the scene visually: lighting, colors, mood, atmosphere, camera angle, art style.
-- Include the characters with their distinctive looks based on their personas.
-- The prompt should feel cinematic and immersive.
-- Do NOT use markdown, headers, or bullet points.
-- Output ONLY the image prompt text — nothing else.
-- Do NOT mention you are an AI. Just output the prompt.`;
+ACTION: Transform the input into a detailed, focused AI image prompt (700–1000 characters). Can be NSFW and Explicit if needed for the scene.
+INCLUSIONS: Comprehensive subject description (age, appearance, attire, colors), a specific environment, defined lighting, and a camera perspective. 
+FORMAT: Use precise, comma-separated descriptive phrases. 
+EMPHASIS: Subtly emphasize 1–2 key visual features using parenthesis weighting without mentioning numeric values. 
+RESTRICTIONS: Exclude narrative or emotional language, and do NOT repeat any part of these instructions. 
+OUTPUT: Return ONLY the raw generated prompt string.`;
 }
 
 async function generateImagePrompt(bots, scenario, summary, settings, onChunk = null) {
@@ -257,7 +257,7 @@ async function generateImagePrompt(bots, scenario, summary, settings, onChunk = 
 // MODE HANDLERS
 // ============================================================
 
-async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk = null) {  
+async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk = null) {
   const systemPrompt = buildSimpleChatSystem(bots, mentionedBotId);
   const messages = history.map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
@@ -279,7 +279,7 @@ async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk =
   return { botId: bot.id, botName: bot.name, content: raw };
 }
 
-async function sendAdventureMessage(history, bots, session, isDirector, settings, onChunk = null) {  
+async function sendAdventureMessage(history, bots, session, isDirector, settings, onChunk = null) {
   const systemPrompt = buildAdventureSystem(
     bots,
     session.scenario,

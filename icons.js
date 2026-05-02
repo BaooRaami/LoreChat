@@ -31,9 +31,11 @@ const ICON_PATHS = {
   /* ─── Empty States ─── */
   emptyChat:      'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z',
   emptyAdventure: 'M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7',
-  emptyStory:     'M18 2h-3a5 5 0 00-10 0H2v20h20V2h-4zm-6 0a3 3 0 010 6 3 3 0 010-6zm6 18H6V6h2v2h8V6h2v14z',
+  emptyStory:     { viewBox: '0 -960 960 960', d: 'M480-160q-48-38-104-59t-116-21q-42 0-82.5 11T100-198q-21 11-40.5-1T40-234v-482q0-11 5.5-21T62-752q46-24 96-36t102-12q58 0 113.5 15T480-740v484q51-32 107-48t113-16q36 0 70.5 6t69.5 18v-480q15 5 29.5 10.5T898-752q11 5 16.5 15t5.5 21v482q0 23-19.5 35t-40.5 1q-37-20-77.5-31T700-240q-60 0-116 21t-104 59Zm80-200v-380l200-200v400L560-360Zm-160 65v-396q-33-14-68.5-21.5T260-720q-37 0-72 7t-68 21v397q35-13 69.5-19t70.5-6q36 0 70.5 6t69.5 19Zm0 0v-396 396Z' },  
   emptyBots:      'M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4c1.66 0 3-1.34 3-3s-1.34-3-3-3zm-2 10H6V7h12v12zm-9-6c-.83 0-1.5-.67-1.5-1.5S8.17 10 9 10s1.5.67 1.5 1.5S9.83 13 9 13zm6 0c-.83 0-1.5-.67-1.5-1.5S14.17 10 15 10s1.5.67 1.5 1.5S15.83 13 15 13z',
 };
+
+
 
 /* ─── CSS Background Icons (prose watermarks & decorative) ─── */
 const ICON_BACKGROUNDS = {
@@ -52,12 +54,14 @@ const ICON_BACKGROUNDS = {
  * @param {string} className — optional CSS class to add to the <svg>
  */
 function getIcon(name, className = '') {
-  const path = ICON_PATHS[name];
-  if (!path) { console.warn('[icons] missing icon:', name); return ''; }
+  const icon = ICON_PATHS[name];
+  if (!icon) { console.warn('[icons] missing icon:', name); return ''; }
   const cls = className ? ` class="${className}"` : '';
-  return `<svg viewBox="0 0 24 24"${cls}><path d="${path}"/></svg>`;
+  const isObj = typeof icon === 'object';
+  const viewBox = isObj ? icon.viewBox : '0 0 24 24';
+  const d = isObj ? icon.d : icon;
+  return `<svg viewBox="${viewBox}"${cls}><path d="${d}"/></svg>`;
 }
-
 /**
  * Inject CSS custom properties for background-image icons used in prose watermarks.
  * Call once on app startup (already wired in app.js onMounted).
