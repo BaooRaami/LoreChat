@@ -44,7 +44,7 @@ createApp({
     const chats = ref([]);
     const adventures = ref([]);
     const stories = ref([]);
-    const settings = ref({ apiKey: '', model: 'openai', memoryDepth: 20, storyChunkSize: 'medium' });
+    const settings = ref({ apiKey: '', pollinationsKey: '', model: 'mistral-small-latest', memoryDepth: 20, storyChunkSize: 'medium' });
 
     // Active session
     const activeSession = ref(null);
@@ -188,9 +188,9 @@ createApp({
 
     function getImageUrl(prompt, seed) {
       const encoded = encodeURIComponent(prompt);
-      const key = settings.value.apiKey ? `&key=${settings.value.apiKey}` : '';
+      const key = settings.value.pollinationsKey ? `&key=${settings.value.pollinationsKey}` : '';
       const seedParam = seed != null ? `&seed=${seed}` : '';
-      return `https://gen.pollinations.ai/image/${encoded}?model=zimage&width=768&height=1152&private=true${seedParam}${key}`;
+      return `${POLLINATIONS_BASE}/image/${encoded}?model=zimage&width=768&height=1152&private=true${seedParam}${key}`;
     }
 
     function formatTime(ts) {

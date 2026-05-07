@@ -1,6 +1,7 @@
 // ai.js — All AI instructions and Pollinations API logic for LoreChat
 
-const AI_BASE = 'https://gen.pollinations.ai';
+const MISTRAL_BASE = 'https://api.mistral.ai';
+const POLLINATIONS_BASE = 'https://gen.pollinations.ai';
 // ============================================================
 // SYSTEM PROMPT BUILDERS
 // ============================================================
@@ -181,23 +182,28 @@ async function callAI(messages, systemPrompt, apiKey, model, onChunk = null) {
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
   try {
-    const res = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+    const res = await fetch(`${MISTRAL_BASE}/v1/chat/completions`, {
       method: 'POST',
       signal: controller.signal,
       headers,
       body: JSON.stringify({
-        model: model || 'openai',
+        model: model || 'mistral-small-latest',
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages
         ],
-        stream: true,
-        private: true
+        stream: true
       })
     });
 
     if (!res.ok) {
-      const errText = await res.text();
+      let errText = '';
+      try {
+        const errJson = await res.json();
+        errText = errJson.error?.message || JSON.stringify(errJson);
+      } catch {
+        errText = await res.text();
+      }
       throw new Error(`API error ${res.status}: ${errText}`);
     }
 
@@ -274,11 +280,11 @@ async function generateImagePrompt(bots, scenario, summary, settings, onChunk = 
 
 async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk = null) {
   const systemPrompt = buildSimpleChatSystem(bots, mentionedBotId);
-  
+
   // Truncate history to memory depth (keep most recent N messages)
   const depth = Math.max(5, Math.min(100, settings.memoryDepth || 20));
   const truncatedHistory = history.length > depth ? history.slice(-depth) : history;
-  
+
   const messages = truncatedHistory.map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
     content: m.role === 'user' ? m.content : `${m.botName}: ${m.content}`
@@ -286,10 +292,10 @@ async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk =
 
   const raw = await callAI(messages, systemPrompt, settings.apiKey, settings.model, onChunk);
 
-  // Parse response to extract bot name and content  
+  // Parse response to extract bot name and content
   let bot, content;
   const colonIdx = raw.indexOf(':');
-  
+
   if (!mentionedBotId && colonIdx > 0 && colonIdx < 30) {
     const name = raw.substring(0, colonIdx).trim();
     content = raw.substring(colonIdx + 1).trim();
@@ -304,7 +310,7 @@ async function sendSimpleChat(history, bots, mentionedBotId, settings, onChunk =
     content = content.substring(bot.name.length + 1).trim();
   }
 
-  // CRITICAL FIX: Truncate if any OTHER character's dialogue appears in the response
+  // Truncate if any OTHER character's dialogue appears in the response
   for (const other of bots) {
     if (other.id === bot.id) continue;
     const otherIdx = content.toLowerCase().indexOf(other.name.toLowerCase() + ':');
@@ -347,7 +353,7 @@ async function sendAdventureMessage(history, bots, session, isDirector, settings
   while ((match = charBlockPattern.exec(raw)) !== null) {
     const charName = match[1].trim();
     if (charName.toUpperCase() === 'NARRATOR') continue;
-    if (charName.toLowerCase() === (session.characterName || 'the player').toLowerCase()) continue;    
+    if (charName.toLowerCase() === (session.characterName || 'the player').toLowerCase()) continue;
     const charContent = match[2].trim();
     if (!charContent) continue;
     const bot = aiBots.find(b => b.name.toLowerCase() === charName.toLowerCase()) || aiBots[0];

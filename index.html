@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>LoreChat</title>
   <link rel="stylesheet" href="style.css" />
   <base target="_blank">
-<base target="_blank">
+  <base target="_blank">
 </head>
+
 <body>
   <div id="app-loader">
     <div class="app-loader-spinner"></div>
@@ -24,17 +26,19 @@
       </div>
       <div class="view-body padded">
         <div class="settings-section">
-          <div class="settings-label">Pollinations API Key</div>
-          <input class="text-input" type="password" v-model="settings.apiKey" placeholder="sk_..." />
+          <div class="settings-label">Mistral API Key</div>
+          <input class="text-input" type="password" v-model="settings.apiKey" placeholder="Your Mistral API key..." />
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Pollinations API Key (for images)</div>
+          <input class="text-input" type="password" v-model="settings.pollinationsKey" placeholder="Your Pollinations API key..." />
         </div>
         <div class="settings-section">
           <div class="settings-label">Default Model</div>
           <select class="text-input" v-model="settings.model">
-            <option value="mistral">Mistral</option>
-            <option value="openai">OpenAI (GPT-4o)</option>
-            <option value="claude">Claude</option>
-            <option value="gemini">Gemini</option>
-            <option value="deepseek">DeepSeek</option>
+            <option value="mistral-small-latest">Mistral Small</option>
+            <option value="mistral-medium-latest">Mistral Medium</option>
+            <option value="mistral-large-latest">Mistral Large</option>
           </select>
         </div>
         <div class="settings-row-2col">
@@ -105,7 +109,8 @@
             <div class="list-item-avatar multi" v-if="chat.botIds.length > 1">
               <span>{{ chat.botIds.length }}</span>
             </div>
-            <div class="list-item-avatar" v-else :style="getBotEmoji(chat.botIds[0]) ? {background:'var(--bg-tertiary)',fontSize:'26px'} : {background: getBotColor(chat.botIds[0])}">
+            <div class="list-item-avatar" v-else
+              :style="getBotEmoji(chat.botIds[0]) ? {background:'var(--bg-tertiary)',fontSize:'26px'} : {background: getBotColor(chat.botIds[0])}">
               {{ getBotEmoji(chat.botIds[0]) || getBotInitial(chat.botIds[0]) }}
             </div>
             <div class="list-item-body">
@@ -192,7 +197,8 @@
         </div>
         <div class="bot-grid">
           <div v-for="bot in bots" :key="bot.id" class="bot-grid-card" @click="editBot(bot)">
-            <div class="bot-grid-avatar" :style="bot.emoji ? {background:'var(--bg-tertiary)',fontSize:'32px'} : {background: bot.color}">
+            <div class="bot-grid-avatar"
+              :style="bot.emoji ? {background:'var(--bg-tertiary)',fontSize:'32px'} : {background: bot.color}">
               {{ bot.emoji || bot.name[0].toUpperCase() }}
             </div>
             <div class="bot-grid-name">{{ bot.name }}{{ bot.isYou ? ' (You)' : '' }}</div>
@@ -202,7 +208,8 @@
     </div>
 
     <!-- ===== UNIFIED CHAT/ADVENTURE/STORY VIEW ===== -->
-    <div v-else-if="view === 'chat' || view === 'adventure' || view === 'story'" :class="['view', view === 'chat' ? 'chat-view' : view === 'story' ? 'story-view' : '']">
+    <div v-else-if="view === 'chat' || view === 'adventure' || view === 'story'"
+      :class="['view', view === 'chat' ? 'chat-view' : view === 'story' ? 'story-view' : '']">
       <div class="topbar">
         <button class="icon-btn" @click="goBack()">
           <span v-html="svg('arrowBack')"></span>
@@ -226,14 +233,16 @@
             <span v-html="svg('kebab')"></span>
           </button>
           <div v-if="chatMenu" class="kebab-dropdown">
-            <div v-if="view === 'story' || view === 'adventure'" class="kebab-item" @click="openSummaryModal(); chatMenu = false">              
+            <div v-if="view === 'story' || view === 'adventure'" class="kebab-item"
+              @click="openSummaryModal(); chatMenu = false">
               <span v-html="svg('summary')"></span>
               Summary
             </div>
-            <div v-if="view === 'story' || view === 'adventure'" class="kebab-item" @click="openGallery(); chatMenu = false">              
+            <div v-if="view === 'story' || view === 'adventure'" class="kebab-item"
+              @click="openGallery(); chatMenu = false">
               <span v-html="svg('image')"></span>
               Gallery
-            </div>            
+            </div>
             <div class="kebab-item" @click="clearSession(); chatMenu = false">
               <span v-html="svg('clear')"></span>
               {{ kebabClearLabel }}
@@ -260,7 +269,8 @@
           <!-- Adventure bot messages: split prose into standalone blocks, dialogue into bubbles -->
           <template v-if="view === 'adventure' && msg.role !== 'user' && !msg.isDirector && !msg.isNarrator">
             <!-- Image message -->
-            <div v-if="msg.isImage" class="prose-image" :class="{loaded: msg.imageUrl, streaming: msg.isPromptStreaming}">
+            <div v-if="msg.isImage" class="prose-image"
+              :class="{loaded: msg.imageUrl, streaming: msg.isPromptStreaming}">
               <div class="image-prompt-overlay">
                 <div class="image-prompt-text">
                   <span class="image-label">{{ msg.isPromptStreaming ? 'Writing prompt...' : 'Generating Image...' }}</span>
@@ -282,10 +292,11 @@
               <button v-if="msg.imageUrl" class="image-reimagine-btn" @click="reimagineImage(msg.id)" title="Reimagine (new prompt)" :disabled="isGeneratingImage">
                 <span v-html="svg('image')"></span>
               </button>
-            </div>            
+            </div>
             <!-- During streaming, show raw content in a single bubble -->
             <div v-if="msg.streaming" class="message-row bot-row">
-              <div class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+              <div class="msg-avatar"
+                :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
                 {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
               </div>
               <div class="message-wrap">
@@ -297,8 +308,11 @@
             </div>
             <!-- After streaming, split into segments -->
             <template v-else v-for="(unit, ui) in getAdventureRenderUnits(msg)" :key="msg.id + '-' + ui">
-              <div v-if="unit.isDialogue" class="message-row bot-row prose-seg-wrapper" :class="{ tapped: isTouchDevice && tappedSegKey === msg.id + '-' + ui }" @click="handleSegTap(msg.id + '-' + ui)">
-                <div class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+              <div v-if="unit.isDialogue" class="message-row bot-row prose-seg-wrapper"
+                :class="{ tapped: isTouchDevice && tappedSegKey === msg.id + '-' + ui }"
+                @click="handleSegTap(msg.id + '-' + ui)">
+                <div class="msg-avatar"
+                  :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
                   {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
                 </div>
                 <div class="message-wrap">
@@ -311,7 +325,9 @@
                   </div>
                 </div>
               </div>
-              <div v-else :class="'prose-seg prose-' + unit.type + ' adventure-prose-block prose-seg-wrapper'" :class="{ tapped: isTouchDevice && tappedSegKey === msg.id + '-' + ui }" @click="handleSegTap(msg.id + '-' + ui)">
+              <div v-else :class="'prose-seg prose-' + unit.type + ' adventure-prose-block prose-seg-wrapper'"
+                :class="{ tapped: isTouchDevice && tappedSegKey === msg.id + '-' + ui }"
+                @click="handleSegTap(msg.id + '-' + ui)">
                 {{ unit.text }}
                 <button class="prose-edit-btn" @click.stop="startEditSegment(msg.id, ui, unit)" title="Edit">
                   <span v-html="svg('edit')"></span>
@@ -320,8 +336,10 @@
             </template>
           </template>
           <!-- Default message rendering (chat mode, adventure user/director/narrator) -->
-          <div v-else :class="['message-row', msg.role === 'user' ? 'user-row' : 'bot-row', msg.isDirector ? 'director-row' : '']">
-            <div v-if="msg.role !== 'user' && !msg.isDirector" class="msg-avatar" :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
+          <div v-else
+            :class="['message-row', msg.role === 'user' ? 'user-row' : 'bot-row', msg.isDirector ? 'director-row' : '']">
+            <div v-if="msg.role !== 'user' && !msg.isDirector" class="msg-avatar"
+              :style="getBotEmoji(msg.botId) ? {background:'var(--bg-tertiary)',fontSize:'18px'} : {background: getBotColor(msg.botId)}">
               {{ getBotEmoji(msg.botId) || (msg.botName ? msg.botName[0].toUpperCase() : '?') }}
             </div>
             <div v-if="msg.isDirector" class="msg-avatar director-avatar">
@@ -329,7 +347,8 @@
             </div>
             <div class="message-wrap">
               <div v-if="msg.role !== 'user'" class="msg-name">{{ msg.isDirector ? '🎬 Director' : msg.botName }}</div>
-              <div :class="['message-bubble', msg.role === 'user' ? 'user-bubble' : 'bot-bubble', msg.isDirector ? 'director-bubble' : '']">
+              <div
+                :class="['message-bubble', msg.role === 'user' ? 'user-bubble' : 'bot-bubble', msg.isDirector ? 'director-bubble' : '']">
                 <span v-if="msg.typing" class="typing-dots"><span></span><span></span><span></span></span>
                 <template v-else>
                   <template v-if="msg.isNarrator || msg.isDirector">
@@ -345,8 +364,10 @@
                     </button>
                   </template>
                   <template v-else>
-                    <div v-for="(seg, si) in parseProseSegments(msg.content)" :key="si" :class="'prose-seg prose-' + seg.type">
-                      <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
+                    <div v-for="(seg, si) in parseProseSegments(msg.content)" :key="si"
+                      :class="'prose-seg prose-' + seg.type">
+                      <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text
+                      }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
                     </div>
                   </template>
                 </template>
@@ -365,7 +386,8 @@
         <div v-if="storyChunks.length === 0 && !isLoading" class="story-start">
           <p style="color: var(--text-muted); font-size: 15px;">Press the send button to begin your story</p>
         </div>
-        <div v-for="(chunk, idx) in storyChunks" :key="idx" :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : (chunk.type === 'image' || chunk.type === 'prompt-streaming') ? 'prose-image' : '', (chunk.type === 'image' && chunk.imageUrl) ? 'loaded' : '', chunk.type === 'prompt-streaming' ? 'streaming' : '']">
+        <div v-for="(chunk, idx) in storyChunks" :key="idx"
+          :class="['story-chunk', chunk.type === 'director' ? 'story-director-chunk' : (chunk.type === 'image' || chunk.type === 'prompt-streaming') ? 'prose-image' : '', (chunk.type === 'image' && chunk.imageUrl) ? 'loaded' : '', chunk.type === 'prompt-streaming' ? 'streaming' : '']">
           <template v-if="chunk.type === 'image' || chunk.type === 'prompt-streaming'">
             <div class="image-prompt-overlay">
               <div class="image-prompt-text">
@@ -388,7 +410,7 @@
             <button v-if="chunk.imageUrl" class="image-reimagine-btn" @click="reimagineImage(chunk.ts)" title="Reimagine (new prompt)" :disabled="isGeneratingImage">
               <span v-html="svg('image')"></span>
             </button>
-          </template>          
+          </template>
           <template v-else-if="chunk.type === 'director'">
             <div class="story-director-content">{{ chunk.content }}</div>
             <button class="prose-edit-btn director-chunk-edit-btn" @click.stop="startEditDirectorChunk(idx)" title="Edit">
@@ -396,10 +418,14 @@
             </button>
           </template>
           <template v-else>
-            <div v-if="idx > 0 && chunk.type !== 'director' && chunk.type !== 'image'" :id="'divider-' + idx" class="story-chunk-divider"><span>✦</span></div>
-            <div v-for="(seg, si) in parseProseSegments(chunk)" :key="si" class="prose-seg-wrapper" :class="{ tapped: isTouchDevice && tappedSegKey === idx + '-' + si }" @click="handleSegTap(idx + '-' + si)">
+            <div v-if="idx > 0 && chunk.type !== 'director' && chunk.type !== 'image'" :id="'divider-' + idx"
+              class="story-chunk-divider"><span>✦</span></div>
+            <div v-for="(seg, si) in parseProseSegments(chunk)" :key="si" class="prose-seg-wrapper"
+              :class="{ tapped: isTouchDevice && tappedSegKey === idx + '-' + si }"
+              @click="handleSegTap(idx + '-' + si)">
               <div v-if="editingSegKey !== idx + '-' + si" :class="'prose-seg prose-' + seg.type + ' story-prose-seg'">
-                <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
+                <span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>{{ seg.text
+                }}<span v-if="seg.type === 'dialogue'" class="prose-quote-mark">"</span>
                 <button class="prose-edit-btn" @click="startEditSegment(idx, si, seg)" title="Edit">
                   <span v-html="svg('edit')"></span>
                 </button>
@@ -484,7 +510,8 @@
     <!-- Create Modal -->
     <div v-if="modal === 'create'" class="modal-overlay" @click.self="modal=null">
       <div class="modal">
-        <div class="modal-title">New {{ homeTab === 'chats' ? 'Chat' : homeTab === 'adventure' ? 'Adventure' : 'Story' }}</div>
+        <div class="modal-title">New {{ homeTab === 'chats' ? 'Chat' : homeTab === 'adventure' ? 'Adventure' : 'Story'
+          }}</div>
         <input class="text-input" v-model="newSession.name" :placeholder="homeTab === 'chats' ? 'Chat name (optional)...' : homeTab === 'adventure' ? 'Adventure title...' : 'Story title...'" />
         <div v-if="homeTab !== 'chats'">
           <textarea class="text-input mt-sm" v-model="newSession.scenario" rows="3" placeholder="Describe the scenario, world, theme..."></textarea>
@@ -493,13 +520,10 @@
         <div class="settings-label mt-sm">Select Bots</div>
         <div v-if="bots.length === 0" class="hint-text">No bots yet — create bots first!</div>
         <div class="bot-selector">
-          <div
-            v-for="bot in bots.filter(b => !(b.isYou && homeTab === 'chats'))"
-            :key="bot.id"
+          <div v-for="bot in bots.filter(b => !(b.isYou && homeTab === 'chats'))" :key="bot.id"
             :class="['bot-chip', newSession.botIds.includes(bot.id) ? 'selected' : '', (bot.isYou && homeTab === 'adventure') ? 'you-locked' : '']"
             @click="(bot.isYou && homeTab === 'adventure') ? null : toggleBotSelection(bot.id)"
-            :style="newSession.botIds.includes(bot.id) ? {borderColor: bot.color, background: bot.color+'22'} : {}"
-          >
+            :style="newSession.botIds.includes(bot.id) ? {borderColor: bot.color, background: bot.color+'22'} : {}">
             <div class="chip-avatar" :style="{background: bot.color}">{{ bot.emoji || bot.name[0].toUpperCase() }}</div>
             {{ bot.name }}{{ bot.isYou ? ' (You)' : '' }}
           </div>
@@ -519,11 +543,12 @@
           <div class="bot-customizer-col">
             <div class="settings-label">Color</div>
             <div class="color-swatches-scroll">
-              <div v-for="c in botColors" :key="c" class="swatch" :style="{background: c}" :class="{selected: editingBot.color===c}" @click="editingBot.color=c"></div>
+              <div v-for="c in botColors" :key="c" class="swatch" :style="{background: c}"
+                :class="{selected: editingBot.color===c}" @click="editingBot.color=c"></div>
             </div>
           </div>
           <div class="bot-customizer-col">
-            <div class="settings-label emoji-picker-label">Emoji</div>            
+            <div class="settings-label emoji-picker-label">Emoji</div>
             <div class="emoji-grid">
               <span
                 v-for="em in botEmojis"
@@ -539,7 +564,7 @@
             {{ editingBot.emoji ? editingBot.emoji : (editingBot.name ? editingBot.name[0].toUpperCase() : '?') }}
           </div>
           <input class="text-input" v-model="editingBot.name" placeholder="Bot name..." />
-        </div>        
+        </div>
         <textarea class="text-input mt-sm" v-model="editingBot.persona" rows="5" placeholder="Describe this bot's personality, role, tone, traits..."></textarea>
         <div class="modal-actions">
           <button class="btn-secondary" @click="modal=null">Cancel</button>
@@ -554,7 +579,8 @@
       <div class="modal">
         <div class="modal-title">Story so far</div>
         <div style="max-height: 55vh; overflow-y: auto; margin-bottom: 16px; padding-right: 4px;">
-          <div v-if="activeSession?.summary" style="white-space: pre-wrap; font-size: 15px; line-height: 1.6; color: var(--text-secondary);">
+          <div v-if="activeSession?.summary"
+            style="white-space: pre-wrap; font-size: 15px; line-height: 1.6; color: var(--text-secondary);">
             {{ activeSession.summary }}
           </div>
           <div v-else style="text-align: center; padding: 32px 0; color: var(--text-muted);">
@@ -570,7 +596,7 @@
     <div v-if="galleryOpen" class="modal-overlay gallery-overlay" @click.self="galleryOpen = false">
       <div class="modal gallery-modal">
         <div class="modal-title">
-          {{ view === 'adventure' ? 'Adventure Gallery' : 'Story Gallery' }}          
+          {{ view === 'adventure' ? 'Adventure Gallery' : 'Story Gallery' }}
           <button class="icon-btn gallery-close-btn" @click="galleryOpen = false">
             <span v-html="svg('close')"></span>
           </button>
@@ -581,7 +607,7 @@
           <span>Generate images to see them here</span>
         </div>
         <div v-else class="gallery-scroll">
-          <div v-for="(item, index) in galleryImages" :key="item.ts || item.id" class="gallery-item">            
+          <div v-for="(item, index) in galleryImages" :key="item.ts || item.id" class="gallery-item">
             <div class="gallery-caption">Image {{ index + 1 }} of {{ galleryImages.length }}</div>
             <img :src="item.imageUrl" :alt="'Image ' + (index + 1)" class="gallery-img" />
           </div>
@@ -590,7 +616,7 @@
       </div>
     </div>
 
-    <!-- Prose Edit Modal -->    
+    <!-- Prose Edit Modal -->
     <div v-if="modal === 'editProse'" class="modal-overlay" @click.self="modal=null">
       <div class="modal">
         <div class="modal-title">{{ editingUserMsgId ? 'Edit Message' : (editingDirectorChunkIdx !== null ? 'Edit Director Note' : 'Edit Prose Segment') }}</div>
@@ -626,4 +652,5 @@
   <script src="ai.js"></script>
   <script src="app.js"></script>
 </body>
+
 </html>
